@@ -1,8 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/ingestion/trigger",
-      "schedule": "*/5 * * * *"
-    }
-  ]
-}
+{}
