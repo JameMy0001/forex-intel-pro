@@ -11,7 +11,7 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { CandleData } from '@/lib/types';
-import { RefreshCw, Calendar } from 'lucide-react';
+import { RefreshCw, Calendar, Eye, EyeOff } from 'lucide-react';
 
 interface InteractivePriceChartProps {
   candles: CandleData[];
@@ -29,6 +29,7 @@ export const InteractivePriceChart: React.FC<InteractivePriceChartProps> = ({
   const [activeTimeframe, setActiveTimeframe] = useState<string>('1D');
   const [isLoadingTimeframe, setIsLoadingTimeframe] = useState<boolean>(false);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [tooltipMode, setTooltipMode] = useState<'smart_float' | 'top_hud'>('smart_float');
 
   // Sync initialCandles when prop changes
   useEffect(() => {
@@ -108,31 +109,31 @@ export const InteractivePriceChart: React.FC<InteractivePriceChartProps> = ({
 
   return (
     <div className="w-full flex flex-col">
-      {/* Chart Header Controls & Non-Obtrusive HUD */}
+      {/* Chart Header Controls & Non-Obtrusive Top HUD */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between pb-3 mb-2 border-b border-white/[0.07] gap-3">
         {/* Dynamic Top Price HUD Bar */}
-        <div className="flex items-center gap-3 text-xs font-mono flex-wrap bg-[#080c16] px-3 py-1.5 rounded-lg border border-white/[0.06]">
+        <div className="flex items-center gap-2.5 text-xs font-mono flex-wrap bg-[#080c16] px-3 py-1.5 rounded-lg border border-white/[0.06] shadow-sm">
           <div className="flex items-center gap-1.5 text-slate-400 text-[11px] pr-2 border-r border-white/[0.08]">
             <Calendar className="w-3 h-3 text-blue-400" />
             <span className="text-white font-bold">{activeCandle?.time}</span>
           </div>
 
-          <div className="flex items-center gap-2 text-[11px]">
+          <div className="flex items-center gap-1.5 text-[11px]">
             <span className="text-slate-500">O:</span>
             <span className="text-white font-bold">{activeCandle?.open.toFixed(decimals)}</span>
           </div>
 
-          <div className="flex items-center gap-2 text-[11px]">
+          <div className="flex items-center gap-1.5 text-[11px]">
             <span className="text-slate-500">H:</span>
             <span className="text-emerald-400 font-bold">{activeCandle?.high.toFixed(decimals)}</span>
           </div>
 
-          <div className="flex items-center gap-2 text-[11px]">
+          <div className="flex items-center gap-1.5 text-[11px]">
             <span className="text-slate-500">L:</span>
             <span className="text-rose-400 font-bold">{activeCandle?.low.toFixed(decimals)}</span>
           </div>
 
-          <div className="flex items-center gap-2 text-[11px]">
+          <div className="flex items-center gap-1.5 text-[11px]">
             <span className="text-slate-500">C:</span>
             <span className="text-white font-bold">{activeCandle?.close.toFixed(decimals)}</span>
             <span
@@ -152,7 +153,7 @@ export const InteractivePriceChart: React.FC<InteractivePriceChartProps> = ({
         </div>
 
         {/* View & Timeframe Switchers */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Timeframe Switcher */}
           <div className="flex rounded-lg bg-[#0a0f1c] p-0.5 border border-white/[0.08] text-[11px]">
             {[
@@ -203,6 +204,20 @@ export const InteractivePriceChart: React.FC<InteractivePriceChartProps> = ({
               พื้นที่
             </button>
           </div>
+
+          {/* Tooltip Float / HUD Toggle */}
+          <button
+            onClick={() => setTooltipMode(tooltipMode === 'smart_float' ? 'top_hud' : 'smart_float')}
+            title={tooltipMode === 'smart_float' ? 'โหมดกล่องลอยตามเมาส์ (Smart Float)' : 'โหมดแสดงบนแถบด้านบน (Docked Top HUD)'}
+            className={`p-1 rounded-lg border text-[10px] flex items-center gap-1 font-mono transition-colors ${
+              tooltipMode === 'smart_float'
+                ? 'bg-blue-950/60 border-blue-600/50 text-blue-300'
+                : 'bg-[#0a0f1c] border-white/[0.08] text-slate-400 hover:text-white'
+            }`}
+          >
+            {tooltipMode === 'smart_float' ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+            <span className="hidden sm:inline">{tooltipMode === 'smart_float' ? 'กล่องลอย' : 'แถบบน'}</span>
+          </button>
         </div>
       </div>
 
@@ -216,12 +231,13 @@ export const InteractivePriceChart: React.FC<InteractivePriceChartProps> = ({
         )}
 
         {chartMode === 'candles' ? (
-          /* Real High-Precision Candlestick SVG Chart (Zero Popup Blocking!) */
+          /* Real High-Precision Candlestick SVG Chart with Smart Offset Popup */
           <CandlestickSvgChart
             data={formattedData}
             minPrice={minPrice}
             maxPrice={maxPrice}
             decimals={decimals}
+            tooltipMode={tooltipMode}
             onHoverIndex={setHoveredIndex}
           />
         ) : (
@@ -303,10 +319,9 @@ export const InteractivePriceChart: React.FC<InteractivePriceChartProps> = ({
 
 /**
  * Institutional-Grade Candlestick SVG Renderer:
+ * - Smart Flip & Offset Floating Tooltip (never covers candle or cursor!)
  * - Crisp Wicks & Bodies
- * - Non-obstructive Crosshairs
- * - Axis Price/Date Badges
- * - Zero Floating Popup Obstruction
+ * - Non-obstructive Crosshairs & Axis Price Badges
  */
 interface CandlestickSvgChartProps {
   data: Array<{
@@ -323,6 +338,7 @@ interface CandlestickSvgChartProps {
   minPrice: number;
   maxPrice: number;
   decimals: number;
+  tooltipMode: 'smart_float' | 'top_hud';
   onHoverIndex: (idx: number | null) => void;
 }
 
@@ -331,11 +347,12 @@ const CandlestickSvgChart: React.FC<CandlestickSvgChartProps> = ({
   minPrice,
   maxPrice,
   decimals,
+  tooltipMode,
   onHoverIndex,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState<number>(600);
-  const [hoverPos, setHoverPos] = useState<{ x: number; y: number; price: number; itemIndex: number } | null>(null);
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number; rawX: number; rawY: number; price: number; itemIndex: number } | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -402,6 +419,8 @@ const CandlestickSvgChart: React.FC<CandlestickSvgChartProps> = ({
         setHoverPos({
           x: paddingLeft + (idx + 0.5) * candleSlotWidth,
           y,
+          rawX: e.clientX - rect.left,
+          rawY: y,
           price: hoverPrice,
           itemIndex: idx,
         });
@@ -425,8 +444,34 @@ const CandlestickSvgChart: React.FC<CandlestickSvgChartProps> = ({
   const maxLabels = Math.max(2, Math.floor(chartWidth / minLabelSpacing));
   const tickStep = Math.max(1, Math.floor(candleCount / maxLabels));
 
+  // Smart Tooltip Positioning: Flips opposite to mouse to NEVER cover the candle!
+  const tooltipWidth = 145;
+  const tooltipHeight = 100;
+  let tooltipLeft = 0;
+  let tooltipTop = 0;
+
+  if (hoverPos) {
+    // If mouse is on right half, flip tooltip to LEFT of cursor with 18px margin
+    if (hoverPos.rawX > chartWidth / 2) {
+      tooltipLeft = hoverPos.x - tooltipWidth - 18;
+    } else {
+      // If mouse is on left half, flip tooltip to RIGHT of cursor with 18px margin
+      tooltipLeft = hoverPos.x + 18;
+    }
+
+    // Keep within bounds
+    tooltipLeft = Math.max(10, Math.min(width - paddingRight - tooltipWidth - 5, tooltipLeft));
+
+    // Vertical placement (places below or above cursor comfortably)
+    if (hoverPos.rawY > chartHeight / 2) {
+      tooltipTop = Math.max(15, hoverPos.y - tooltipHeight - 10);
+    } else {
+      tooltipTop = Math.min(chartHeight - tooltipHeight, hoverPos.y + 15);
+    }
+  }
+
   return (
-    <div ref={containerRef} className="w-full h-full relative">
+    <div ref={containerRef} className="w-full h-full relative select-none">
       <svg
         width={width}
         height={height}
@@ -602,6 +647,35 @@ const CandlestickSvgChart: React.FC<CandlestickSvgChartProps> = ({
           </g>
         )}
       </svg>
+
+      {/* Smart Flip Floating Tooltip (Only if mode is smart_float, flips away from cursor to NEVER block the candle!) */}
+      {tooltipMode === 'smart_float' && hoveredItem && hoverPos && (
+        <div
+          className="absolute z-30 pointer-events-none bg-[#090e1b]/95 border border-blue-500/40 p-2.5 rounded-lg shadow-2xl text-xs font-mono space-y-1 backdrop-blur-md transition-transform duration-75"
+          style={{
+            left: tooltipLeft,
+            top: tooltipTop,
+            width: tooltipWidth,
+          }}
+        >
+          <div className="text-slate-400 text-[10px] font-bold border-b border-white/[0.08] pb-1 flex items-center justify-between">
+            <span>{hoveredItem.time}</span>
+            <span className={hoveredItem.isBullish ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+              {hoveredItem.isBullish ? '▲ เขียว' : '▼ แดง'}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10.5px] pt-0.5">
+            <div className="text-slate-400">O: <span className="text-white font-bold">{hoveredItem.open.toFixed(decimals)}</span></div>
+            <div className="text-slate-400">H: <span className="text-emerald-400 font-bold">{hoveredItem.high.toFixed(decimals)}</span></div>
+            <div className="text-slate-400">L: <span className="text-rose-400 font-bold">{hoveredItem.low.toFixed(decimals)}</span></div>
+            <div className="text-slate-400">C: <span className="text-white font-bold">{hoveredItem.close.toFixed(decimals)}</span></div>
+          </div>
+          <div className="text-[9.5px] text-blue-300 pt-1 flex justify-between border-t border-white/[0.06]">
+            <span>EMA20: {hoveredItem.ema20.toFixed(decimals)}</span>
+            <span className="text-amber-400">EMA50: {hoveredItem.ema50.toFixed(decimals)}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
