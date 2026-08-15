@@ -252,45 +252,76 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* 2. ALERT THRESHOLD & SENSITIVITY */}
+      {/* 2. ALERT THRESHOLD & SENSITIVITY (WIN RATE) */}
       <div className="terminal-card p-5 space-y-4">
-        <div className="flex items-center justify-between border-b border-[#1e293b] pb-3">
+        <div className="flex items-center justify-between border-b border-white/[0.07] pb-3">
           <div className="flex items-center gap-2">
             <Sliders className="w-4 h-4 text-emerald-400" />
-            <h2 className="text-sm font-bold text-white font-mono uppercase">
-              ALERT PROBABILITY SENSITIVITY
+            <h2 className="text-sm font-bold text-white font-sans uppercase">
+              กำหนดเกณฑ์วินเรทขั้นต่ำในการแจ้งเตือน (WIN RATE FILTER)
             </h2>
           </div>
-          <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800">
-            Trigger at &gt; {(minAlertProbability * 100).toFixed(0)}% Conviction
+          <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-950/70 px-2.5 py-1 rounded-full border border-emerald-800/80">
+            แจ้งเตือนเมื่อวินเรท &ge; {(minAlertProbability * 100).toFixed(0)}%
           </span>
         </div>
 
-        <div className="space-y-3">
-          <div className="flex justify-between text-xs text-slate-400 font-mono">
-            <span>Minimum Win Probability to Trigger Alert:</span>
-            <span className="text-white font-bold text-sm">{(minAlertProbability * 100).toFixed(0)}%</span>
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+            <span className="text-slate-300 font-sans">
+              ระดับอัตราการชนะ (Win Rate) ขั้นต่ำที่ยอมรับให้ส่งเข้า Telegram:
+            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl font-black font-mono text-emerald-400">
+                {(minAlertProbability * 100).toFixed(0)}%
+              </span>
+              <span className="text-xs text-slate-400 font-sans">ขึ้นไป</span>
+            </div>
           </div>
 
+          {/* Range Slider */}
           <input
             type="range"
-            min="0.55"
-            max="0.85"
-            step="0.05"
+            min="0.60"
+            max="0.90"
+            step="0.01"
             value={minAlertProbability}
             onChange={(e) => {
               const val = Number(e.target.value);
               setMinAlertProbability(val);
               handleSaveSettings({ min_alert_probability: val });
             }}
-            className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+            className="w-full h-2.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
           />
 
-          <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-            <span>55% (Moderate Signals)</span>
-            <span>70% (Recommended Standard)</span>
-            <span>85% (Extreme Conviction Only)</span>
+          {/* Quick Preset Buttons */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+            {[
+              { val: 0.70, label: '70% (ค่าแนะนำมาตรฐาน)' },
+              { val: 0.75, label: '75% (คัดกรองแม่นยำสูง)' },
+              { val: 0.80, label: '80% (ความมั่นใจระดับสถาบัน)' },
+              { val: 0.85, label: '85% (Extreme Conviction)' },
+            ].map((preset) => (
+              <button
+                key={preset.val}
+                onClick={() => {
+                  setMinAlertProbability(preset.val);
+                  handleSaveSettings({ min_alert_probability: preset.val });
+                }}
+                className={`py-2 px-2.5 rounded-lg border text-xs font-mono transition-all text-center ${
+                  Math.abs(minAlertProbability - preset.val) < 0.005
+                    ? 'bg-emerald-600 border-emerald-400 text-white font-bold shadow-md shadow-emerald-600/30'
+                    : 'bg-[#0b101c] border-white/[0.08] text-slate-300 hover:border-slate-700'
+                }`}
+              >
+                {preset.label}
+              </button>
+            ))}
           </div>
+
+          <p className="text-[11px] text-slate-400 thai-text">
+            💡 <b>คำแนะนำ:</b> หากตั้งไว้ที่ <b>70% ขึ้นไป</b> ระบบจะกรองและส่งแจ้งเตือน Telegram เฉพาะจังหวะเทรดที่มีความได้เปรียบทางสถิติสูงเท่านั้น สัญญาณที่วินเรทต่ำกว่าเกณฑ์จะไม่ถูกส่งมารบกวน
+          </p>
         </div>
       </div>
 

@@ -186,12 +186,21 @@ export function calculateProbabilityScore(
     rr = 2.0;
   }
 
+  // Directional Win Rate (e.g. 72% for STRONG_SELL instead of 28%)
+  const winRate = isBearish
+    ? Number(((1 - probability) * 100).toFixed(1))
+    : isBullish
+    ? Number((probability * 100).toFixed(1))
+    : 50.0;
+
   // Explanation Narrative
-  const explanation = `${direction.replace('_', ' ')}: ${(probability * 100).toFixed(1)}% Conviction. Sentiment (${(sentimentComponent >= 0 ? '+' : '') + (sentimentComponent * 100).toFixed(0)}%), RSI (${indicators.rsi_14.toFixed(1)}), MACD (${indicators.macd_histogram >= 0 ? 'Bullish' : 'Bearish'}), Trend (${indicators.trend_bias}).`;
+  const thaiAction = isBullish ? 'ขาขึ้น (BUY)' : isBearish ? 'ขาลง (SELL)' : 'ไซด์เวย์ (NEUTRAL)';
+  const explanation = `${direction.replace('_', ' ')} (${thaiAction}): วินเรท ${winRate}% Conviction. ข่าว Sentiment (${(sentimentComponent >= 0 ? '+' : '') + (sentimentComponent * 100).toFixed(0)}%), RSI (${indicators.rsi_14.toFixed(1)}), MACD (${indicators.macd_histogram >= 0 ? 'Bullish' : 'Bearish'}), แนวโน้ม Trend (${indicators.trend_bias}).`;
 
   return {
     ticker,
     probability_score: probability,
+    win_rate_percent: winRate,
     confidence_level: confidence,
     direction,
     sentiment_component: sentimentComponent,

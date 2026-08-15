@@ -43,12 +43,15 @@ async function runPricesIngestion() {
         news
       );
 
-      console.log(`   [${sym.ticker}] Price: ${quote.price} | Direction: ${signal.direction} | Probability: ${(signal.probability_score * 100).toFixed(1)}%`);
+      const winRate = signal.win_rate_percent || 50;
+      console.log(`   [${sym.ticker}] Price: ${quote.price} | Action: ${signal.direction} | Win Rate: ${winRate}%`);
 
-      // Check alert trigger threshold based on custom settings
-      const alertThreshold = settings.min_alert_probability || sym.alert_threshold;
-      if (settings.telegram_enabled && (signal.probability_score >= alertThreshold || signal.probability_score <= (1 - alertThreshold))) {
-        console.log(`   🚨 High conviction threshold triggered for ${sym.ticker}! Sending Telegram Alert...`);
+      // Check alert trigger threshold based on custom settings (e.g. >= 70%)
+      const alertThreshold = (settings.min_alert_probability || sym.alert_threshold || 0.70) * 100;
+      const isActionable = signal.direction !== 'NEUTRAL';
+
+      if (settings.telegram_enabled && isActionable && winRate >= alertThreshold) {
+        console.log(`   🚨 High conviction threshold triggered for ${sym.ticker} (Win Rate: ${winRate}% >= ${alertThreshold}%)! Sending Telegram Alert...`);
         const alertRes = await sendTelegramSignalAlert(signal);
         console.log(`   Telegram Alert Result:`, alertRes);
       }

@@ -15,38 +15,44 @@ export async function sendTelegramSignalAlert(
   const isBuy = signal.direction.includes('BUY');
   const isSell = signal.direction.includes('SELL');
   const icon = isBuy ? '🚀 🟢' : isSell ? '🔻 🔴' : '⚖️ 🟡';
-  const probPercent = (signal.probability_score * 100).toFixed(1);
 
-  let text = `${icon} <b>TRADE SIGNAL ALERT: ${signal.ticker}</b>\n`;
+  // Calculate true directional win rate % (e.g. 72.5% for STRONG_SELL instead of 27.5%)
+  const directionalWinRate = isSell
+    ? (1 - signal.probability_score) * 100
+    : (isBuy ? signal.probability_score * 100 : 50);
+
+  const probPercent = directionalWinRate.toFixed(1);
+
+  let text = `${icon} <b>แจ้งเตือนสัญญาณเทรด (HIGH CONVICTION): ${signal.ticker}</b>\n`;
   text += `━━━━━━━━━━━━━━━━━━━━━\n`;
-  text += `🎯 <b>Signal:</b> <b>${signal.direction.replace('_', ' ')}</b>\n`;
-  text += `📊 <b>Win Probability:</b> <b>${probPercent}%</b> (${signal.confidence_level} Conviction)\n`;
-  text += `💵 <b>Market Price:</b> <code>${signal.price || signal.recommended_entry}</code>\n\n`;
+  text += `🎯 <b>ฝั่งคำสั่ง (Action):</b> <b>${isBuy ? 'BUY (เปิดสถานะซื้อ) 🟢' : isSell ? 'SELL (เปิดสถานะขาย) 🔴' : 'WAIT (รอจังหวะ) 🟡'}</b>\n`;
+  text += `📊 <b>อัตราการชนะ (Win Rate):</b> <b>${probPercent}%</b> (${signal.confidence_level} Conviction)\n`;
+  text += `💵 <b>ราคาตลาดปัจจุบัน (Price):</b> <code>${signal.price || signal.recommended_entry}</code>\n\n`;
 
-  text += `📱 <b>METATRADER 5 (MT5) TRADE SETUP:</b>\n`;
-  text += `<i>(แตะที่ตัวเลขเพื่อคัดลอกไปใส่ใน MT5 บนมือถือ)</i>\n`;
-  text += `• <b>Action:</b> <b>${isBuy ? 'BUY 🟢' : isSell ? 'SELL 🔴' : 'WAIT 🟡'}</b>\n`;
+  text += `📱 <b>พารามิเตอร์สำหรับ MetaTrader 5 (MT5):</b>\n`;
+  text += `<i>(แตะที่ตัวเลขเพื่อคัดลอกไปใส่ใน MT5 บนมือถือได้ทันที)</i>\n`;
+  text += `• <b>Order Type:</b> <b>${isBuy ? 'BUY 🟢' : isSell ? 'SELL 🔴' : 'WAIT 🟡'}</b>\n`;
   text += `• <b>Entry:</b> <code>${signal.recommended_entry}</code>\n`;
   text += `• <b>Stop Loss (SL):</b> <code>${signal.stop_loss}</code>\n`;
   text += `• <b>Take Profit 1 (TP1):</b> <code>${signal.take_profit_1}</code>\n`;
   text += `• <b>Take Profit 2 (TP2):</b> <code>${signal.take_profit_2}</code>\n`;
-  text += `• <b>Risk/Reward:</b> 1:${signal.risk_reward_ratio}\n\n`;
+  text += `• <b>Risk/Reward Ratio:</b> 1:${signal.risk_reward_ratio}\n\n`;
 
-  text += `🧠 <b>SIGNALS BREAKDOWN:</b>\n`;
-  text += `• Sentiment: <b>${(signal.sentiment_component >= 0 ? '+' : '') + (signal.sentiment_component * 100).toFixed(0)}%</b>\n`;
-  text += `• Technicals: <b>${(signal.technical_component >= 0 ? '+' : '') + (signal.technical_component * 100).toFixed(0)}%</b>\n`;
-  text += `• Trend: <b>${(signal.trend_component >= 0 ? '+' : '') + (signal.trend_component * 100).toFixed(0)}%</b>\n\n`;
+  text += `🧠 <b>องค์ประกอบการวิเคราะห์ (Signals Breakdown):</b>\n`;
+  text += `• Sentiment ข่าวการเงิน: <b>${(signal.sentiment_component >= 0 ? '+' : '') + (signal.sentiment_component * 100).toFixed(0)}%</b>\n`;
+  text += `• โมเมนตัมเทคนิค (RSI/MACD): <b>${(signal.technical_component >= 0 ? '+' : '') + (signal.technical_component * 100).toFixed(0)}%</b>\n`;
+  text += `• ความสอดคล้องของ Trend: <b>${(signal.trend_component >= 0 ? '+' : '') + (signal.trend_component * 100).toFixed(0)}%</b>\n\n`;
 
   if (aiAnalysis?.macro_catalyst) {
-    text += `🌐 <b>AI Macro Driver:</b>\n${aiAnalysis.macro_catalyst}\n\n`;
+    text += `🌐 <b>ปัจจัยมหภาคขับเคลื่อน (Macro Catalyst):</b>\n${aiAnalysis.macro_catalyst}\n\n`;
   }
 
   if (aiAnalysis?.trade_thesis) {
-    text += `💡 <b>Trade Thesis:</b>\n${aiAnalysis.trade_thesis}\n\n`;
+    text += `💡 <b>แผนการเทรดโดย AI (Trade Thesis):</b>\n${aiAnalysis.trade_thesis}\n\n`;
   }
 
-  text += `⏰ <i>${new Date().toUTCString()}</i>\n`;
-  text += `⚡ <i>Powered by Forex & Stock Intelligence Engine</i>`;
+  text += `⏰ <i>เวลาบันทึกสัญญาณ: ${new Date().toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok' })} (เวลาไทย)</i>\n`;
+  text += `⚡ <i>Nexus Intel Pro • Institutional Quantitative Engine</i>`;
 
   try {
     const url = `https://api.telegram.org/bot${token}/sendMessage`;
@@ -89,7 +95,7 @@ export async function sendTelegramTestPing(): Promise<{ success: boolean; error?
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId,
-        text: `🟢 <b>NEXUS INTEL PRO: CONNECTED!</b>\n\nYour Telegram Alert Bot is active and paired with MetaTrader 5 on your mobile device.\n\n⏰ <i>${new Date().toUTCString()}</i>`,
+        text: `🟢 <b>NEXUS INTEL PRO: เชื่อมต่อสำเร็จ!</b>\n\nบอทแจ้งเตือนสัญญาณเทรดพร้อมทำงานคู่กับ MetaTrader 5 บนมือถือของคุณ 24 ชั่วโมงแล้วครับ\n\n⏰ <i>${new Date().toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok' })} (เวลาไทย)</i>`,
         parse_mode: 'HTML',
       }),
     });

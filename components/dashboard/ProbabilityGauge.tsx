@@ -16,19 +16,17 @@ export const ProbabilityGauge: React.FC<ProbabilityGaugeProps> = ({
   size = 120,
   showLabels = true,
 }) => {
-  const percentage = Math.min(100, Math.max(0, Math.round(score * 100)));
+  const rawPercentage = Math.min(100, Math.max(0, Math.round(score * 100)));
   const isBullish = direction.includes('BUY');
   const isBearish = direction.includes('SELL');
 
-  // Gauge angle from -90 to +90 degrees (180 deg arc)
+  // Directional Win Rate (e.g., 72% for STRONG_SELL instead of 28%)
+  const winRate = isBearish ? (100 - rawPercentage) : (isBullish ? rawPercentage : 50);
+
+  // Gauge needle angle from -90 to +90 degrees (180 deg arc)
   const angle = (score - 0.5) * 180; // 0 -> -90 deg, 0.5 -> 0 deg, 1.0 -> +90 deg
 
-  const color = isBullish ? '#10b981' : isBearish ? '#ef4444' : '#f59e0b';
-  const glowColor = isBullish
-    ? 'rgba(16, 185, 129, 0.25)'
-    : isBearish
-    ? 'rgba(239, 68, 68, 0.25)'
-    : 'rgba(245, 158, 11, 0.25)';
+  const color = isBullish ? '#10b981' : isBearish ? '#f43f5e' : '#f59e0b';
 
   return (
     <div className="flex flex-col items-center justify-center select-none">
@@ -39,7 +37,7 @@ export const ProbabilityGauge: React.FC<ProbabilityGaugeProps> = ({
         >
           <defs>
             <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#ef4444" />
+              <stop offset="0%" stopColor="#f43f5e" />
               <stop offset="45%" stopColor="#f59e0b" />
               <stop offset="55%" stopColor="#f59e0b" />
               <stop offset="100%" stopColor="#10b981" />
@@ -53,7 +51,7 @@ export const ProbabilityGauge: React.FC<ProbabilityGaugeProps> = ({
           <path
             d="M 15 50 A 35 35 0 0 1 85 50"
             fill="none"
-            stroke="#1e293b"
+            stroke="rgba(255,255,255,0.08)"
             strokeWidth="8"
             strokeLinecap="round"
           />
@@ -85,11 +83,12 @@ export const ProbabilityGauge: React.FC<ProbabilityGaugeProps> = ({
           </g>
         </svg>
 
-        {/* Center Percentage Display */}
+        {/* Center Win Rate Percentage Display */}
         <div className="absolute bottom-0 flex flex-col items-center">
-          <span className="text-sm font-bold font-mono text-white leading-none">
-            {percentage}%
+          <span className="text-base font-black font-mono text-white leading-none tracking-tight">
+            {winRate}%
           </span>
+          <span className="text-[9px] text-slate-400 font-sans mt-0.5">วินเรท (Win Rate)</span>
         </div>
       </div>
 
@@ -98,10 +97,10 @@ export const ProbabilityGauge: React.FC<ProbabilityGaugeProps> = ({
           <span
             className={`text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
               isBullish
-                ? 'text-emerald-400 bg-emerald-950/60 border-emerald-800/60'
+                ? 'text-emerald-400 bg-emerald-950/70 border-emerald-800/80'
                 : isBearish
-                ? 'text-rose-400 bg-rose-950/60 border-rose-800/60'
-                : 'text-amber-400 bg-amber-950/60 border-amber-800/60'
+                ? 'text-rose-400 bg-rose-950/70 border-rose-800/80'
+                : 'text-amber-400 bg-amber-950/70 border-amber-800/80'
             }`}
           >
             {direction.replace('_', ' ')}

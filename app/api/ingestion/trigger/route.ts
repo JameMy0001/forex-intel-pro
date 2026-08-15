@@ -38,14 +38,19 @@ export async function GET(request: Request) {
           news
         );
 
-        // Check and send Telegram Alert
-        const alertThreshold = settings.min_alert_probability || sym.alert_threshold;
+        // Check and send Telegram Alert with strict Win Rate Filter
+        const alertThreshold = (settings.min_alert_probability || sym.alert_threshold || 0.70) * 100;
         let alertSent = false;
         let alertResult = null;
 
+        const isActionable = signal.direction !== 'NEUTRAL';
+        const currentWinRate = signal.win_rate_percent || 50;
+
+        // ONLY trigger alert if win rate >= threshold (e.g. >= 70%) AND direction is BUY or SELL
         if (
           settings.telegram_enabled &&
-          (signal.probability_score >= alertThreshold || signal.probability_score <= (1 - alertThreshold))
+          isActionable &&
+          currentWinRate >= alertThreshold
         ) {
           alertResult = await sendTelegramSignalAlert(signal);
           alertSent = alertResult.success;

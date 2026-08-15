@@ -108,6 +108,7 @@ export interface SignalOutput {
   computed_at: string;
   price?: number;
   change_percent?: number;
+  win_rate_percent?: number;
 }
 
 export interface AIAnalysisOutput {
