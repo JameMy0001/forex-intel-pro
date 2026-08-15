@@ -1,0 +1,39 @@
+{
+  "name": "forex-stock-intel-engine",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "cron:prices": "npx tsx scripts/cron-ingest-prices.ts",
+    "cron:news": "npx tsx scripts/cron-ingest-news.ts",
+    "backtest": "npx tsx scripts/backtest-signals.ts"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.17.4",
+    "@supabase/supabase-js": "^2.48.1",
+    "better-sqlite3": "^13.0.3",
+    "clsx": "^2.1.1",
+    "dotenv": "^16.4.7",
+    "lucide-react": "^0.468.0",
+    "next": "^14.2.24",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.15.0",
+    "tailwind-merge": "^2.6.0",
+    "technicalindicators": "^3.1.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^20.17.10",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

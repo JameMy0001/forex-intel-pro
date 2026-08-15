@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #080b11;
+  --bg-secondary: #0f1420;
+  --bg-card: #131b2c;
+  --border-color: #1e293b;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --color-bull: #10b981;
+  --color-bear: #ef4444;
+  --color-neutral: #f59e0b;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Custom Scrollbar for sleek trading terminal */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #080b11;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+/* Glassmorphism & Glow Utilities */
+.terminal-card {
+  background-color: #0f1523;
+  border: 1px solid #1e293b;
+  border-radius: 0.5rem;
+}
+
+.terminal-card-interactive {
+  background-color: #0f1523;
+  border: 1px solid #1e293b;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease-in-out;
+}
+
+.terminal-card-interactive:hover {
+  border-color: #334155;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+}
+
+.glow-bull {
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.15);
+}
+
+.glow-bear {
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.15);
+}
+
+/* Ticker text monospace */
+.font-mono-numbers {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+  font-variant-numeric: tabular-nums;
+}
