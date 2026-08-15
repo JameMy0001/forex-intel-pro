@@ -8,11 +8,10 @@ import {
   Line,
   XAxis,
   YAxis,
-  Tooltip,
   CartesianGrid,
 } from 'recharts';
 import { CandleData } from '@/lib/types';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Calendar } from 'lucide-react';
 
 interface InteractivePriceChartProps {
   candles: CandleData[];
@@ -103,25 +102,50 @@ export const InteractivePriceChart: React.FC<InteractivePriceChartProps> = ({
     ? formattedData[hoveredIndex]
     : formattedData[formattedData.length - 1];
 
+  const candleChangePercent = activeCandle
+    ? ((activeCandle.close - activeCandle.open) / activeCandle.open) * 100
+    : 0;
+
   return (
     <div className="w-full flex flex-col">
-      {/* Chart Header Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-2 border-b border-white/[0.07] gap-3">
-        {/* Active Candle Price HUD */}
-        <div className="flex items-center gap-3 text-xs font-mono">
-          <div className="text-slate-400 text-[11px]">
-            O: <span className="text-white font-bold">{activeCandle?.open.toFixed(decimals)}</span>
+      {/* Chart Header Controls & Non-Obtrusive HUD */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between pb-3 mb-2 border-b border-white/[0.07] gap-3">
+        {/* Dynamic Top Price HUD Bar */}
+        <div className="flex items-center gap-3 text-xs font-mono flex-wrap bg-[#080c16] px-3 py-1.5 rounded-lg border border-white/[0.06]">
+          <div className="flex items-center gap-1.5 text-slate-400 text-[11px] pr-2 border-r border-white/[0.08]">
+            <Calendar className="w-3 h-3 text-blue-400" />
+            <span className="text-white font-bold">{activeCandle?.time}</span>
           </div>
-          <div className="text-slate-400 text-[11px]">
-            H: <span className="text-emerald-400 font-bold">{activeCandle?.high.toFixed(decimals)}</span>
+
+          <div className="flex items-center gap-2 text-[11px]">
+            <span className="text-slate-500">O:</span>
+            <span className="text-white font-bold">{activeCandle?.open.toFixed(decimals)}</span>
           </div>
-          <div className="text-slate-400 text-[11px]">
-            L: <span className="text-rose-400 font-bold">{activeCandle?.low.toFixed(decimals)}</span>
+
+          <div className="flex items-center gap-2 text-[11px]">
+            <span className="text-slate-500">H:</span>
+            <span className="text-emerald-400 font-bold">{activeCandle?.high.toFixed(decimals)}</span>
           </div>
-          <div className="text-slate-400 text-[11px]">
-            C: <span className="text-white font-bold">{activeCandle?.close.toFixed(decimals)}</span>
+
+          <div className="flex items-center gap-2 text-[11px]">
+            <span className="text-slate-500">L:</span>
+            <span className="text-rose-400 font-bold">{activeCandle?.low.toFixed(decimals)}</span>
           </div>
-          <div className="hidden md:flex items-center gap-2 pl-2 border-l border-white/[0.08]">
+
+          <div className="flex items-center gap-2 text-[11px]">
+            <span className="text-slate-500">C:</span>
+            <span className="text-white font-bold">{activeCandle?.close.toFixed(decimals)}</span>
+            <span
+              className={`text-[10px] font-bold px-1 rounded ${
+                candleChangePercent >= 0 ? 'text-emerald-400 bg-emerald-950/50' : 'text-rose-400 bg-rose-950/50'
+              }`}
+            >
+              {candleChangePercent >= 0 ? '+' : ''}
+              {candleChangePercent.toFixed(2)}%
+            </span>
+          </div>
+
+          <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-white/[0.08]">
             <span className="text-blue-400 text-[10px]">EMA20: {activeCandle?.ema20.toFixed(decimals)}</span>
             <span className="text-amber-400 text-[10px]">EMA50: {activeCandle?.ema50.toFixed(decimals)}</span>
           </div>
@@ -160,7 +184,7 @@ export const InteractivePriceChart: React.FC<InteractivePriceChartProps> = ({
                 chartMode === 'candles' ? 'bg-emerald-700 text-white font-bold shadow-sm' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              แท่งเทียน (Candles)
+              แท่งเทียน
             </button>
             <button
               onClick={() => setChartMode('composed')}
@@ -168,7 +192,7 @@ export const InteractivePriceChart: React.FC<InteractivePriceChartProps> = ({
                 chartMode === 'composed' ? 'bg-blue-600 text-white font-bold shadow-sm' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              แนวโน้ม (Trend)
+              แนวโน้ม
             </button>
             <button
               onClick={() => setChartMode('area')}
@@ -176,7 +200,7 @@ export const InteractivePriceChart: React.FC<InteractivePriceChartProps> = ({
                 chartMode === 'area' ? 'bg-blue-600 text-white font-bold shadow-sm' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              พื้นที่ (Area)
+              พื้นที่
             </button>
           </div>
         </div>
@@ -192,7 +216,7 @@ export const InteractivePriceChart: React.FC<InteractivePriceChartProps> = ({
         )}
 
         {chartMode === 'candles' ? (
-          /* Real Custom Candlestick SVG Chart */
+          /* Real High-Precision Candlestick SVG Chart (Zero Popup Blocking!) */
           <CandlestickSvgChart
             data={formattedData}
             minPrice={minPrice}
@@ -236,31 +260,6 @@ export const InteractivePriceChart: React.FC<InteractivePriceChartProps> = ({
                 axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
                 tickFormatter={(v) => Number(v).toFixed(decimals)}
               />
-              <Tooltip
-                content={({ active, payload }) => {
-                  if (active && payload && payload.length) {
-                    const d = payload[0].payload;
-                    return (
-                      <div className="bg-[#090d18] border border-white/[0.12] p-3 rounded-lg shadow-2xl text-xs font-mono space-y-1">
-                        <div className="text-slate-400 text-[10px] pb-1 border-b border-white/[0.08] font-bold">
-                          {d.time} ({activeTimeframe})
-                        </div>
-                        <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] pt-1">
-                          <div className="text-slate-400">Open: <span className="text-white font-bold">{d.open.toFixed(decimals)}</span></div>
-                          <div className="text-slate-400">High: <span className="text-emerald-400 font-bold">{d.high.toFixed(decimals)}</span></div>
-                          <div className="text-slate-400">Low: <span className="text-rose-400 font-bold">{d.low.toFixed(decimals)}</span></div>
-                          <div className="text-slate-400">Close: <span className="text-white font-bold">{d.close.toFixed(decimals)}</span></div>
-                        </div>
-                        <div className="text-[10px] text-blue-400 pt-1 flex justify-between border-t border-white/[0.06]">
-                          <span>EMA 20: {d.ema20.toFixed(decimals)}</span>
-                          <span className="text-amber-400">EMA 50: {d.ema50.toFixed(decimals)}</span>
-                        </div>
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
               {chartMode === 'area' ? (
                 <Area
                   type="monotone"
@@ -303,7 +302,11 @@ export const InteractivePriceChart: React.FC<InteractivePriceChartProps> = ({
 };
 
 /**
- * High-Performance Candlestick SVG Renderer with Crosshair and EMA Overlay
+ * Institutional-Grade Candlestick SVG Renderer:
+ * - Crisp Wicks & Bodies
+ * - Non-obstructive Crosshairs
+ * - Axis Price/Date Badges
+ * - Zero Floating Popup Obstruction
  */
 interface CandlestickSvgChartProps {
   data: Array<{
@@ -332,7 +335,7 @@ const CandlestickSvgChart: React.FC<CandlestickSvgChartProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState<number>(600);
-  const [hoverPos, setHoverPos] = useState<{ x: number; y: number; itemIndex: number } | null>(null);
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number; price: number; itemIndex: number } | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -347,8 +350,8 @@ const CandlestickSvgChart: React.FC<CandlestickSvgChartProps> = ({
   }, []);
 
   const height = 360;
-  const paddingRight = 60;
-  const paddingBottom = 30;
+  const paddingRight = 65;
+  const paddingBottom = 26;
   const paddingTop = 15;
   const paddingLeft = 10;
 
@@ -361,9 +364,14 @@ const CandlestickSvgChart: React.FC<CandlestickSvgChartProps> = ({
     return paddingTop + chartHeight * (1 - ratio);
   };
 
+  const getPriceFromY = (y: number) => {
+    const ratio = 1 - (y - paddingTop) / chartHeight;
+    return minPrice + ratio * priceRange;
+  };
+
   const candleCount = data.length;
   const candleSlotWidth = chartWidth / candleCount;
-  const candleBodyWidth = Math.max(2, Math.min(10, candleSlotWidth * 0.7));
+  const candleBodyWidth = Math.max(2.5, Math.min(11, candleSlotWidth * 0.75));
 
   // Build grid horizontal lines
   const gridCount = 5;
@@ -387,10 +395,16 @@ const CandlestickSvgChart: React.FC<CandlestickSvgChartProps> = ({
     const x = e.clientX - rect.left - paddingLeft;
     const y = e.clientY - rect.top;
 
-    if (x >= 0 && x <= chartWidth) {
+    if (x >= 0 && x <= chartWidth && y >= paddingTop && y <= paddingTop + chartHeight) {
       const idx = Math.floor(x / candleSlotWidth);
       if (idx >= 0 && idx < data.length) {
-        setHoverPos({ x: paddingLeft + (idx + 0.5) * candleSlotWidth, y, itemIndex: idx });
+        const hoverPrice = getPriceFromY(y);
+        setHoverPos({
+          x: paddingLeft + (idx + 0.5) * candleSlotWidth,
+          y,
+          price: hoverPrice,
+          itemIndex: idx,
+        });
         onHoverIndex(idx);
         return;
       }
@@ -405,6 +419,11 @@ const CandlestickSvgChart: React.FC<CandlestickSvgChartProps> = ({
   };
 
   const hoveredItem = hoverPos ? data[hoverPos.itemIndex] : null;
+
+  // Calculate clean X-axis step intervals so labels never collide
+  const minLabelSpacing = 85;
+  const maxLabels = Math.max(2, Math.floor(chartWidth / minLabelSpacing));
+  const tickStep = Math.max(1, Math.floor(candleCount / maxLabels));
 
   return (
     <div ref={containerRef} className="w-full h-full relative">
@@ -423,7 +442,7 @@ const CandlestickSvgChart: React.FC<CandlestickSvgChartProps> = ({
               y1={g.y}
               x2={width - paddingRight}
               y2={g.y}
-              stroke="rgba(255,255,255,0.06)"
+              stroke="rgba(255,255,255,0.05)"
               strokeDasharray="3 3"
             />
             <text
@@ -447,11 +466,12 @@ const CandlestickSvgChart: React.FC<CandlestickSvgChartProps> = ({
           const yClose = getY(c.close);
 
           const bodyTop = Math.min(yOpen, yClose);
-          const bodyHeight = Math.max(1.5, Math.abs(yOpen - yClose));
+          const bodyHeight = Math.max(1.8, Math.abs(yOpen - yClose));
           const color = c.isBullish ? '#10b981' : '#f43f5e';
+          const isHovered = hoverPos && hoverPos.itemIndex === i;
 
           return (
-            <g key={i} className="transition-opacity">
+            <g key={i} opacity={hoverPos && !isHovered ? 0.75 : 1} className="transition-opacity">
               {/* Wick Line */}
               <line
                 x1={cx}
@@ -459,7 +479,7 @@ const CandlestickSvgChart: React.FC<CandlestickSvgChartProps> = ({
                 x2={cx}
                 y2={yLow}
                 stroke={color}
-                strokeWidth={1.2}
+                strokeWidth={isHovered ? 1.8 : 1.2}
               />
               {/* Candle Body */}
               <rect
@@ -481,6 +501,7 @@ const CandlestickSvgChart: React.FC<CandlestickSvgChartProps> = ({
           strokeWidth={1.5}
           points={ema20Points}
           strokeLinejoin="round"
+          opacity={0.85}
         />
 
         {/* EMA 50 Line Overlay (Amber) */}
@@ -490,11 +511,12 @@ const CandlestickSvgChart: React.FC<CandlestickSvgChartProps> = ({
           strokeWidth={1.5}
           points={ema50Points}
           strokeLinejoin="round"
+          opacity={0.85}
         />
 
-        {/* Time X-Axis Ticks (Every 5-8 candles) */}
+        {/* Time X-Axis Ticks (Cleanly spaced) */}
         {data.map((c, i) => {
-          if (i % Math.max(5, Math.floor(candleCount / 6)) === 0 || i === candleCount - 1) {
+          if (i % tickStep === 0 || i === candleCount - 1) {
             const cx = paddingLeft + (i + 0.5) * candleSlotWidth;
             return (
               <text
@@ -513,8 +535,8 @@ const CandlestickSvgChart: React.FC<CandlestickSvgChartProps> = ({
           return null;
         })}
 
-        {/* Crosshair Lines on Hover */}
-        {hoverPos && (
+        {/* Precise Crosshair Lines & Axis Badges on Hover */}
+        {hoverPos && hoveredItem && (
           <g>
             {/* Vertical crosshair */}
             <line
@@ -522,8 +544,8 @@ const CandlestickSvgChart: React.FC<CandlestickSvgChartProps> = ({
               y1={paddingTop}
               x2={hoverPos.x}
               y2={paddingTop + chartHeight}
-              stroke="rgba(255,255,255,0.3)"
-              strokeDasharray="2 2"
+              stroke="rgba(255,255,255,0.35)"
+              strokeDasharray="3 3"
             />
             {/* Horizontal crosshair */}
             <line
@@ -531,37 +553,55 @@ const CandlestickSvgChart: React.FC<CandlestickSvgChartProps> = ({
               y1={hoverPos.y}
               x2={width - paddingRight}
               y2={hoverPos.y}
-              stroke="rgba(255,255,255,0.3)"
-              strokeDasharray="2 2"
+              stroke="rgba(255,255,255,0.35)"
+              strokeDasharray="3 3"
             />
+
+            {/* Y-Axis Price Badge (Right) */}
+            <rect
+              x={width - paddingRight + 2}
+              y={hoverPos.y - 9}
+              width={paddingRight - 4}
+              height={18}
+              fill="#1e293b"
+              stroke="#3b82f6"
+              rx={3}
+            />
+            <text
+              x={width - paddingRight + 6}
+              y={hoverPos.y + 3.5}
+              fill="#ffffff"
+              fontSize={10}
+              fontFamily="JetBrains Mono, monospace"
+              fontWeight="bold"
+            >
+              {hoverPos.price.toFixed(decimals)}
+            </text>
+
+            {/* X-Axis Date Badge (Bottom) */}
+            <rect
+              x={hoverPos.x - 45}
+              y={paddingTop + chartHeight + 2}
+              width={90}
+              height={18}
+              fill="#1e293b"
+              stroke="#3b82f6"
+              rx={3}
+            />
+            <text
+              x={hoverPos.x}
+              y={paddingTop + chartHeight + 14}
+              fill="#ffffff"
+              fontSize={9}
+              fontFamily="JetBrains Mono, monospace"
+              fontWeight="bold"
+              textAnchor="middle"
+            >
+              {hoveredItem.time}
+            </text>
           </g>
         )}
       </svg>
-
-      {/* Floating Hover Tooltip Card */}
-      {hoveredItem && hoverPos && (
-        <div
-          className="absolute z-30 pointer-events-none bg-[#090d18] border border-white/[0.15] p-3 rounded-lg shadow-2xl text-xs font-mono space-y-1 backdrop-blur-md"
-          style={{
-            left: Math.min(width - 170, Math.max(10, hoverPos.x - 70)),
-            top: 20,
-          }}
-        >
-          <div className="text-slate-400 text-[10px] font-bold border-b border-white/[0.08] pb-1">
-            {hoveredItem.time}
-          </div>
-          <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] pt-0.5">
-            <div className="text-slate-400">Open: <span className="text-white font-bold">{hoveredItem.open.toFixed(decimals)}</span></div>
-            <div className="text-slate-400">High: <span className="text-emerald-400 font-bold">{hoveredItem.high.toFixed(decimals)}</span></div>
-            <div className="text-slate-400">Low: <span className="text-rose-400 font-bold">{hoveredItem.low.toFixed(decimals)}</span></div>
-            <div className="text-slate-400">Close: <span className="text-white font-bold">{hoveredItem.close.toFixed(decimals)}</span></div>
-          </div>
-          <div className="text-[10px] text-blue-400 pt-1 flex justify-between border-t border-white/[0.06]">
-            <span>EMA20: {hoveredItem.ema20.toFixed(decimals)}</span>
-            <span className="text-amber-400">EMA50: {hoveredItem.ema50.toFixed(decimals)}</span>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
