@@ -198,18 +198,39 @@ export async function fetchCandleHistory(
     }
   }
 
+  // Map resolution to Yahoo interval & range
+  let yfInterval = '1d';
+  let yfRange = '3mo';
+  let isIntraday = false;
+
+  if (resolution === '15' || resolution === '15M') {
+    yfInterval = '15m';
+    yfRange = '5d';
+    isIntraday = true;
+  } else if (resolution === '60' || resolution === '1H') {
+    yfInterval = '60m';
+    yfRange = '1mo';
+    isIntraday = true;
+  } else if (resolution === '240' || resolution === '4H') {
+    yfInterval = '60m';
+    yfRange = '2mo';
+    isIntraday = true;
+  }
+
   // Try Yahoo Finance Historical Candles
   try {
     const yahooSymbol = ticker.includes('EURUSD') ? 'EURUSD=X' :
                         ticker.includes('GBPUSD') ? 'GBPUSD=X' :
                         ticker.includes('USDJPY') ? 'JPY=X' :
+                        ticker.includes('GBPJPY') ? 'GBPJPY=X' :
+                        ticker.includes('EURJPY') ? 'EURJPY=X' :
                         ticker.includes('AUDUSD') ? 'AUDUSD=X' :
                         ticker.includes('USDCHF') ? 'CHF=X' :
                         ticker.includes('USDCAD') ? 'CAD=X' :
                         ticker.includes('XAUUSD') ? 'GC=F' :
                         ticker;
 
-    const yfUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=1d&range=3mo`;
+    const yfUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=${yfInterval}&range=${yfRange}`;
     const res = await fetch(yfUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
@@ -227,12 +248,16 @@ export async function fetchCandleHistory(
         for (let i = 0; i < timestamps.length; i++) {
           const c = quotes.close[i];
           const o = quotes.open[i] || c;
-          const h = quotes.high[i] || c;
-          const l = quotes.low[i] || c;
+          const h = quotes.high[i] || Math.max(o, c);
+          const l = quotes.low[i] || Math.min(o, c);
           const v = quotes.volume ? quotes.volume[i] : 0;
 
           if (c !== null && c !== undefined && !isNaN(c)) {
             const date = new Date(timestamps[i] * 1000);
+            const timeStr = isIntraday
+              ? `${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
+              : date.toISOString().split('T')[0];
+
             candles.push({
               timestamp: timestamps[i] * 1000,
               open: Number(o.toFixed(4)),
@@ -240,7 +265,7 @@ export async function fetchCandleHistory(
               low: Number(l.toFixed(4)),
               close: Number(c.toFixed(4)),
               volume: v || 0,
-              timeStr: date.toISOString().split('T')[0],
+              timeStr,
             });
           }
         }
