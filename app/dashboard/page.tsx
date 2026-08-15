@@ -111,53 +111,53 @@ export default function DashboardPage() {
       )}
 
       {/* Dashboard Top Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#0d1320] p-4 rounded-lg border border-[#1e293b]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#0a0f1c] p-4 rounded-xl border border-white/[0.07] shadow-lg">
         <div>
-          <h1 className="text-xl font-black text-white font-mono tracking-tight flex items-center gap-2">
-            <span>REAL-TIME TRADING TERMINAL</span>
-            <span className="flex items-center gap-1 text-[11px] font-normal text-emerald-400 bg-emerald-950/80 border border-emerald-800 px-2 py-0.5 rounded-full">
-              <Radio className="w-3 h-3 animate-pulse" /> Live Streaming
+          <h1 className="text-lg font-black text-white font-sans tracking-tight flex items-center gap-2">
+            <span>แดชบอร์ดวิเคราะห์การเทรดแบบเรียลไทม์ (REAL-TIME TERMINAL)</span>
+            <span className="flex items-center gap-1 text-[10px] font-medium text-emerald-400 bg-emerald-950/80 border border-emerald-800/80 px-2 py-0.5 rounded-full">
+              <Radio className="w-2.5 h-2.5 animate-pulse" /> กำลังสตรีมข้อมูลสด
             </span>
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Statistical Probability Engine • Macro News Sentiment Correlation • Multi-Factor Signals
+          <p className="text-xs text-slate-400 mt-0.5 thai-text">
+            คำนวณความน่าจะเป็นเชิงสถิติ • วิเคราะห์ Sentiment ข่าวการเงินโลก • สัญญาณเทรดแบบ Multi-Factor
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono">
             <Clock className="w-3.5 h-3.5 text-slate-500" />
-            <span>Updated: {lastUpdated || 'Loading...'}</span>
+            <span>อัปเดตล่าสุด: {lastUpdated || 'กำลังโหลด...'}</span>
           </div>
 
           <button
             onClick={() => fetchSignals(true)}
             disabled={isRefreshing}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white transition-all shadow-md shadow-blue-600/20 disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            <span>Sync Live</span>
+            <span>ดึงข้อมูลสด</span>
           </button>
         </div>
       </div>
 
       {/* Focus Mode Banner (If locked to USDJPY, etc.) */}
       {focusSymbol !== 'ALL' && (
-        <div className="bg-blue-950/60 border border-blue-600/60 rounded-lg p-3.5 flex items-center justify-between gap-3 text-xs font-mono">
-          <div className="flex items-center gap-2 text-blue-300">
+        <div className="bg-blue-950/40 border border-blue-500/40 rounded-xl p-3.5 flex items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5 text-blue-200">
             <span className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-ping" />
-            <span className="font-bold text-white uppercase">
-              🎯 FOCUS LOCK ACTIVE: {focusSymbol} ONLY
+            <span className="font-bold font-sans text-white uppercase text-xs">
+              🎯 กำลังล็อคโฟกัสเฉพาะ: {focusSymbol}
             </span>
-            <span className="hidden sm:inline text-slate-400">
-              — The engine is calculating and sending alerts exclusively for {focusSymbol}.
+            <span className="hidden sm:inline text-slate-400 thai-text">
+              — ระบบกำลังคำนวณและส่งแจ้งเตือน Telegram เฉพาะคู่เงิน {focusSymbol} เท่านั้น
             </span>
           </div>
           <a
             href="/settings"
-            className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-colors shrink-0"
+            className="px-3 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-colors shrink-0 text-xs"
           >
-            Change / Unlock
+            เปลี่ยน / ปลดล็อค
           </a>
         </div>
       )}
@@ -167,11 +167,11 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Zap className="w-4 h-4 text-amber-400" />
-            <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
-              HIGH CONVICTION TRADE SETUPS
+            <h2 className="text-xs font-bold text-white uppercase tracking-wider font-sans">
+              🎯 จังหวะเทรดความน่าจะเป็นสูง (HIGH CONVICTION SETUPS)
             </h2>
           </div>
-          <span className="text-xs text-slate-400 font-mono">Filtered: Win Probability &gt; 65% / &lt; 35%</span>
+          <span className="text-[11px] text-slate-400 font-mono">กรองความน่าจะเป็น &gt; 65% หรือ &lt; 35%</span>
         </div>
 
         {loading ? (

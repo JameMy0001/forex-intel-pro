@@ -59,6 +59,8 @@ export interface NewsArticle {
   ticker: string;
   headline: string;
   summary: string;
+  thai_headline?: string;
+  thai_summary?: string;
   url: string;
   image_url?: string;
   published_at: string;

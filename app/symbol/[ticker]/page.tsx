@@ -214,16 +214,16 @@ export default function SymbolDetailPage() {
         <div className="lg:col-span-1 terminal-card p-5 flex flex-col justify-between space-y-4">
           <div>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-mono font-bold text-slate-400 uppercase">
-                PROBABILITY CONVICTION
+              <span className="text-xs font-sans font-bold text-slate-300 uppercase">
+                ระดับความน่าจะเป็น (Probability)
               </span>
               <span
-                className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border uppercase ${
+                className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border uppercase ${
                   isBull
-                    ? 'text-emerald-400 bg-emerald-950/60 border-emerald-800/60'
+                    ? 'text-emerald-400 bg-emerald-950/70 border-emerald-800/80'
                     : isBear
-                    ? 'text-rose-400 bg-rose-950/60 border-rose-800/60'
-                    : 'text-amber-400 bg-amber-950/60 border-amber-800/60'
+                    ? 'text-rose-400 bg-rose-950/70 border-rose-800/80'
+                    : 'text-amber-400 bg-amber-950/70 border-amber-800/80'
                 }`}
               >
                 {signal.confidence_level}
@@ -240,11 +240,11 @@ export default function SymbolDetailPage() {
             </div>
 
             {/* Decomposition Factor Bars */}
-            <div className="space-y-2 mt-4 text-xs font-mono">
+            <div className="space-y-2 mt-4 text-xs font-sans">
               <div>
                 <div className="flex justify-between text-slate-400 text-[11px] mb-0.5">
-                  <span>Sentiment Factor:</span>
-                  <span className="text-white font-bold">
+                  <span>Sentiment ข่าวการเงิน:</span>
+                  <span className="text-white font-bold font-mono">
                     {(signal.sentiment_component >= 0 ? '+' : '') + (signal.sentiment_component * 100).toFixed(0)}%
                   </span>
                 </div>
@@ -258,8 +258,8 @@ export default function SymbolDetailPage() {
 
               <div>
                 <div className="flex justify-between text-slate-400 text-[11px] mb-0.5">
-                  <span>Technical Momentum:</span>
-                  <span className="text-white font-bold">
+                  <span>โมเมนตัมเทคนิค (RSI/MACD):</span>
+                  <span className="text-white font-bold font-mono">
                     {(signal.technical_component >= 0 ? '+' : '') + (signal.technical_component * 100).toFixed(0)}%
                   </span>
                 </div>
@@ -273,8 +273,8 @@ export default function SymbolDetailPage() {
 
               <div>
                 <div className="flex justify-between text-slate-400 text-[11px] mb-0.5">
-                  <span>Macro Trend Alignment:</span>
-                  <span className="text-white font-bold">
+                  <span>ความสอดคล้องของ Trend:</span>
+                  <span className="text-white font-bold font-mono">
                     {(signal.trend_component >= 0 ? '+' : '') + (signal.trend_component * 100).toFixed(0)}%
                   </span>
                 </div>
@@ -289,29 +289,29 @@ export default function SymbolDetailPage() {
           </div>
 
           {/* Trade Execution Levels Box */}
-          <div className="bg-[#0b101c] p-3.5 rounded-lg border border-[#1a2336] space-y-2 text-xs">
-            <div className="flex justify-between text-slate-300">
-              <span className="flex items-center gap-1 text-slate-400">
-                <Zap className="w-3.5 h-3.5 text-blue-400" /> Entry Level:
+          <div className="bg-[#090d18] p-3.5 rounded-lg border border-white/[0.07] space-y-2 text-xs">
+            <div className="flex justify-between items-center text-slate-300">
+              <span className="flex items-center gap-1 text-slate-400 font-sans">
+                <Zap className="w-3.5 h-3.5 text-blue-400" /> จุดเข้าแนะนำ (Entry):
               </span>
-              <span className="font-mono font-bold text-white">{signal.recommended_entry}</span>
+              <span className="font-mono font-bold text-white mt5-copy-pill">{signal.recommended_entry}</span>
             </div>
-            <div className="flex justify-between text-slate-300">
-              <span className="flex items-center gap-1 text-rose-400">
-                <ShieldAlert className="w-3.5 h-3.5 text-rose-400" /> Stop Loss (Risk):
+            <div className="flex justify-between items-center text-slate-300">
+              <span className="flex items-center gap-1 text-rose-400 font-sans">
+                <ShieldAlert className="w-3.5 h-3.5 text-rose-400" /> ตัดขาดทุน (Stop Loss):
               </span>
-              <span className="font-mono font-bold text-rose-300">{signal.stop_loss}</span>
+              <span className="font-mono font-bold text-rose-300 mt5-copy-pill">{signal.stop_loss}</span>
             </div>
-            <div className="flex justify-between text-slate-300">
-              <span className="flex items-center gap-1 text-emerald-400">
-                <Target className="w-3.5 h-3.5 text-emerald-400" /> Take Profit 1 & 2:
+            <div className="flex justify-between items-center text-slate-300">
+              <span className="flex items-center gap-1 text-emerald-400 font-sans">
+                <Target className="w-3.5 h-3.5 text-emerald-400" /> ทำกำไร (TP1 / TP2):
               </span>
-              <span className="font-mono font-bold text-emerald-300">
+              <span className="font-mono font-bold text-emerald-300 mt5-copy-pill">
                 {signal.take_profit_1} / {signal.take_profit_2}
               </span>
             </div>
-            <div className="flex justify-between text-slate-400 border-t border-slate-800 pt-1.5 text-[11px]">
-              <span>Risk/Reward Ratio:</span>
+            <div className="flex justify-between text-slate-400 border-t border-white/[0.06] pt-1.5 text-[11px] font-sans">
+              <span>อัตราผลตอบแทนต่อความเสี่ยง:</span>
               <span className="font-mono font-bold text-white">1:{signal.risk_reward_ratio}</span>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import { NewsArticle, SentimentLabel } from '../types';
 import { resilientFetch } from './rateLimiter';
+import { enrichArticleWithThaiSummary } from './thaiNewsHelper';
 
 const MARKETAUX_API_KEY = process.env.MARKETAUX_API_KEY || '';
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY || '';
@@ -214,7 +215,7 @@ export async function fetchMarketauxNews(tickers: string[] = ['EURUSD', 'AAPL', 
   const now = new Date();
   return defaultHeadlines.map((item, idx) => {
     const pubDate = new Date(now.getTime() - idx * 45 * 60 * 1000);
-    return {
+    const rawArticle: NewsArticle = {
       id: `real-news-${idx}-${Date.now()}`,
       source: 'Global Financial Terminal',
       ticker: item.ticker,
@@ -225,5 +226,6 @@ export async function fetchMarketauxNews(tickers: string[] = ['EURUSD', 'AAPL', 
       sentiment_score: item.sentiment,
       sentiment_label: getSentimentLabel(item.sentiment),
     };
+    return enrichArticleWithThaiSummary(rawArticle);
   });
 }
