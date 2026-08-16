@@ -12,7 +12,9 @@ import {
   TrendingUp,
   Cloud,
   Zap,
+  LogOut,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface NavbarProps {
   onRefresh?: () => void;
@@ -26,6 +28,21 @@ export const Navbar: React.FC<NavbarProps> = ({
   lastUpdated,
 }) => {
   const pathname = usePathname();
+  const router = useRouter();
+
+  if (pathname === '/login') {
+    return null;
+  }
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      router.push('/login');
+      router.refresh();
+    } catch (err) {
+      window.location.href = '/login';
+    }
+  };
 
   const navItems = [
     { label: 'แดชบอร์ด (Terminal)', href: '/dashboard', icon: BarChart3 },
@@ -101,6 +118,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="hidden sm:inline">{isRefreshing ? 'กำลังซิงค์...' : 'รีเฟรช'}</span>
               </button>
             )}
+
+            {/* Logout Button */}
+            <button
+              onClick={handleLogout}
+              title="ออกจากระบบ (Logout)"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-white/[0.04] hover:bg-rose-500/20 hover:text-rose-300 border border-white/[0.08] hover:border-rose-500/30 text-slate-400 text-xs font-medium transition-all"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">ออก</span>
+            </button>
           </div>
         </div>
       </div>

@@ -32,6 +32,47 @@ export default function SettingsPage() {
   const [savingSettings, setSavingSettings] = useState<boolean>(false);
   const [saveToast, setSaveToast] = useState<string | null>(null);
 
+  // Master Password Change State
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPass, setChangingPass] = useState(false);
+  const [passMessage, setPassMessage] = useState<{ text: string; success: boolean } | null>(null);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword || newPassword.trim().length < 4) {
+      setPassMessage({ text: 'รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 4 ตัวอักษร', success: false });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPassMessage({ text: 'รหัสผ่านยืนยันไม่ตรงกัน', success: false });
+      return;
+    }
+
+    setChangingPass(true);
+    setPassMessage(null);
+
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPassMessage({ text: 'เปลี่ยนรหัสผ่านสำเร็จเรียบร้อยแล้ว!', success: true });
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        setPassMessage({ text: data.error || 'เกิดข้อผิดพลาดในการเปลี่ยนรหัสผ่าน', success: false });
+      }
+    } catch (err) {
+      setPassMessage({ text: 'เกิดข้อผิดพลาดในการเชื่อมต่อ', success: false });
+    } finally {
+      setChangingPass(false);
+    }
+  };
+
   // Load existing settings on mount
   useEffect(() => {
     async function loadSettings() {
@@ -417,6 +458,69 @@ export default function SettingsPage() {
             );
           })}
         </div>
+      </div>
+
+      {/* 5. MASTER SECURITY & PASSCODE MANAGEMENT */}
+      <div className="terminal-card p-5 space-y-4 border-indigo-900/60 bg-[#0c1220]">
+        <div className="flex items-center justify-between border-b border-[#1e293b] pb-3">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-indigo-400" />
+            <div>
+              <h2 className="text-sm font-bold text-white font-mono uppercase">
+                WEB ACCESS SECURITY (ระบบรักษาความปลอดภัย & รหัสผ่านเข้าเว็บ)
+              </h2>
+              <p className="text-xs text-slate-400">
+                เปลี่ยนรหัสผ่านหลัก (Master Passcode) สำหรับใช้เข้าสู่หน้าแดชบอร์ดและสัญญาณเทรด
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <form onSubmit={handleChangePassword} className="space-y-3 max-w-md">
+          <div>
+            <label className="block text-xs font-mono text-slate-300 mb-1">รหัสผ่านใหม่ (New Master Passcode):</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="กรอกรหัสผ่านใหม่ (อย่างน้อย 4 ตัวอักษร)..."
+              className="w-full bg-[#080b11] border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-mono text-slate-300 mb-1">ยืนยันรหัสผ่านใหม่อีกครั้ง (Confirm Password):</label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="พิมพ์รหัสผ่านใหม่อีกครั้ง..."
+              className="w-full bg-[#080b11] border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+
+          {passMessage && (
+            <div
+              className={`p-2.5 rounded-lg text-xs font-mono flex items-center gap-2 ${
+                passMessage.success
+                  ? 'bg-emerald-950/80 border border-emerald-800 text-emerald-300'
+                  : 'bg-rose-950/80 border border-rose-800 text-rose-300'
+              }`}
+            >
+              {passMessage.success ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+              <span>{passMessage.text}</span>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={changingPass}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold font-mono transition-all disabled:opacity-50 flex items-center gap-1.5 shadow-md shadow-indigo-600/20"
+          >
+            {changingPass ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Key className="w-3.5 h-3.5" />}
+            <span>{changingPass ? 'กำลังบันทึก...' : 'บันทึกรหัสผ่านใหม่'}</span>
+          </button>
+        </form>
       </div>
     </div>
   );
