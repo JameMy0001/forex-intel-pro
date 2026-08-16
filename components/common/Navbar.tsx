@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Activity,
+  BarChart2,
   BarChart3,
+  Calendar,
   Settings,
   RefreshCw,
   Cpu,
@@ -47,6 +49,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const navItems = [
     { label: 'แดชบอร์ด (Terminal)', href: '/dashboard', icon: BarChart3 },
     { label: 'ตารางสัญญาณ (Matrix)', href: '/signals', icon: Activity },
+    { label: 'ประวัติ & สถิติ (History)', href: '/history', icon: BarChart2 },
     { label: 'ตั้งค่า & แจ้งเตือน (Settings)', href: '/settings', icon: Settings },
   ];
 

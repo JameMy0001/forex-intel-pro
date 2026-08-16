@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
 import { DEFAULT_SYMBOLS } from '@/lib/constants/defaultSymbols';
 import { fetchLiveQuote, fetchCandleHistory } from '@/lib/ingestion/finnhubClient';
-import { fetchMarketauxNews } from '@/lib/ingestion/marketauxClient';
+import { getCachedDailyNews } from '@/lib/ingestion/newsCache';
 import { computeTechnicalIndicators } from '@/lib/signal-engine/indicators';
 import { calculateProbabilityScore } from '@/lib/signal-engine/probability';
 import { generateAIAnalysis } from '@/lib/signal-engine/aiAnalyst';
-import { getSupabaseServerClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -36,7 +35,7 @@ export async function GET(request: Request) {
 
     // Fetch news for sentiment calculations
     const tickerList = symbols.map((s) => s.ticker);
-    const newsArticles = await fetchMarketauxNews(tickerList);
+    const newsArticles = await getCachedDailyNews(tickerList);
 
     // Parallel fetch & compute signals
     const signalPromises = symbols.map(async (sym) => {
@@ -84,12 +83,21 @@ export async function GET(request: Request) {
 
     // Save to Turso / SQLite Database
     try {
-      const { savePriceSnapshot, saveSignal, saveNewsArticles } = await import('@/lib/db/localDb');
+      const { savePriceSnapshot, saveSignal, saveNewsArticles, getRecentSignals } = await import('@/lib/db/localDb');
       await saveNewsArticles(newsArticles);
       for (const item of results) {
         if (item) {
           await savePriceSnapshot(item.quote);
-          await saveSignal(item.signal);
+          
+          const recent = await getRecentSignals(item.signal.ticker, 1);
+          const lastSignal = recent[0];
+          const lastComputedAt = lastSignal?.computed_at ? new Date(String(lastSignal.computed_at)).getTime() : 0;
+          const isRecent = Date.now() - lastComputedAt < 30 * 60 * 1000; // 30 min
+          const sameDirection = lastSignal?.direction === item.signal.direction;
+          
+          if (!isRecent || !sameDirection) {
+            await saveSignal(item.signal);
+          }
         }
       }
     } catch (dbErr) {

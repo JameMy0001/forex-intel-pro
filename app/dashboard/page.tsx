@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { WatchlistTable, WatchlistRowData } from '@/components/dashboard/WatchlistTable';
 import { TopConvictionCard } from '@/components/dashboard/TopConvictionCard';
 import { LiveNewsFeed } from '@/components/dashboard/LiveNewsFeed';
+import { EconomicCalendarWidget } from '@/components/dashboard/EconomicCalendarWidget';
 import { NewsArticle } from '@/lib/types';
 import {
   Activity,
@@ -217,7 +218,7 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Section 2: Main Grid (Watchlist Table + Live News Stream) */}
+      {/* Section 2: Main Grid (Watchlist Table + Live News Stream + Calendar) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Watchlist Table (2 cols on large screen) */}
         <div className="lg:col-span-2">
@@ -232,12 +233,18 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Live News Stream (1 col) */}
-        <div className="lg:col-span-1">
+        {/* Right Sidebar: News Feed + Economic Calendar */}
+        <div className="lg:col-span-1 space-y-5">
           {loading ? (
-            <div className="terminal-card p-8 h-96 animate-pulse-subtle bg-slate-900/40"></div>
+            <>
+              <div className="terminal-card p-8 h-64 animate-pulse-subtle bg-slate-900/40"></div>
+              <div className="terminal-card p-8 h-64 animate-pulse-subtle bg-slate-900/40"></div>
+            </>
           ) : (
-            <LiveNewsFeed articles={newsFeed} />
+            <>
+              <LiveNewsFeed articles={newsFeed} />
+              <EconomicCalendarWidget />
+            </>
           )}
         </div>
       </div>
