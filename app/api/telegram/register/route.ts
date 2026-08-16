@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8810668462:AAFsC93MEg0iq2Lu-U2YcevJ7sDNXWCh7dE';
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const WEBHOOK_URL = 'https://1intel-pro-jame.vercel.app/api/telegram/webhook';
 
 export async function GET() {

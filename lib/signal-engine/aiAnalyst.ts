@@ -15,7 +15,7 @@ export async function generateAIAnalysis(
 ): Promise<AIAnalysisOutput> {
   const newsContext = newsArticles
     .slice(0, 5)
-    .map((a, i) => `${i + 1}. [${a.source}] ${a.headline} (Sentiment: ${a.sentiment_score}): ${a.summary}`)
+    .map((a, i) => `${i + 1}. [${a.source}] ${a.thai_headline || a.headline} (Sentiment: ${a.sentiment_score}): ${a.thai_summary || a.summary}`)
     .join('\n');
 
   if (GEMINI_API_KEY) {
@@ -54,27 +54,32 @@ ${newsContext || 'ไม่มีข่าวเฉพาะเจาะจง �
 }`;
 
       const aiResponse = await resilientFetch('gemini', async () => {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: 0.2,
-              responseMimeType: 'application/json',
-            },
-          }),
-        });
+        const models = ['gemini-3.5-flash', 'gemini-flash-lite-latest', 'gemini-3.7-flash'];
+        for (const model of models) {
+          try {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+            const res = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: {
+                  temperature: 0.15,
+                  responseMimeType: 'application/json',
+                },
+              }),
+            });
 
-        if (!res.ok) {
-          throw new Error(`Gemini API HTTP ${res.status}: ${res.statusText}`);
+            if (res.ok) {
+              const data = await res.json();
+              const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (rawText) {
+                return JSON.parse(rawText.trim());
+              }
+            }
+          } catch (mErr) {}
         }
-
-        const data = await res.json();
-        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!rawText) throw new Error('Empty response from Gemini');
-        return JSON.parse(rawText);
+        throw new Error('All Gemini model endpoints failed');
       });
 
       return {

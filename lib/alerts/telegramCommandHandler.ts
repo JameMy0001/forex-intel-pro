@@ -2,13 +2,12 @@ import { fetchLiveQuote, fetchCandleHistory } from '../ingestion/finnhubClient';
 import { fetchMarketauxNews } from '../ingestion/marketauxClient';
 import { computeTechnicalIndicators } from '../signal-engine/indicators';
 import { calculateProbabilityScore } from '../signal-engine/probability';
-import { generateAIAnalysis } from '../signal-engine/aiAnalyst';
 import { getSystemSettings, updateSystemSettings } from '../db/localDb';
 import { DEFAULT_SYMBOLS } from '../constants/defaultSymbols';
-import { AssetType } from '../types';
+import { enrichArticleWithThaiSummary } from '../ingestion/thaiNewsHelper';
+import { AssetType, NewsArticle } from '../types';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-const ALLOWED_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
 /**
@@ -60,66 +59,83 @@ export const QUICK_KEYBOARD = {
 };
 
 /**
- * Synthesize real-time news with Gemini 2.0 into rich Thai summary
+ * Synthesize real-time news into 100% PURE THAI summary using Gemini AI
  */
 async function synthesizeThaiNews(
   ticker: string,
-  newsArticles: Array<{ headline: string; summary: string; published_at: string; source: string; sentiment_label?: string }>
+  displayName: string,
+  newsArticles: NewsArticle[]
 ): Promise<string> {
-  if (!GEMINI_API_KEY || newsArticles.length === 0) {
-    if (newsArticles.length === 0) {
-      return `<i>ยังไม่มีข่าวด่วนสำคัญของ ${ticker} ในช่วง 24 ชั่วโมงที่ผ่านมา ตลาดเคลื่อนไหวตามเทคนิคอลและกระแสเงินทุนหลัก</i>`;
-    }
-    return newsArticles
-      .slice(0, 3)
-      .map((n, i) => `• <b>${n.headline}</b>\n  <i>${n.summary?.slice(0, 150)}...</i>`)
-      .join('\n\n');
-  }
+  // Enrich all articles with Thai summaries first
+  const enrichedArticles = newsArticles.map((a) => enrichArticleWithThaiSummary(a));
 
-  try {
-    const newsContext = newsArticles
+  if (GEMINI_API_KEY) {
+    const models = ['gemini-3.5-flash', 'gemini-flash-lite-latest', 'gemini-3.7-flash'];
+
+    const newsContext = enrichedArticles
       .slice(0, 5)
-      .map((a, idx) => `[${idx + 1}] Source: ${a.source} (${a.published_at})\nTitle: ${a.headline}\nBody: ${a.summary}`)
+      .map(
+        (a, idx) =>
+          `[ข่าวที่ ${idx + 1}] แหล่งข่าว: ${a.source || 'Marketaux'}\nหัวข้อข่าว: ${a.thai_headline || a.headline}\nเนื้อหา: ${a.thai_summary || a.summary}`
+      )
       .join('\n\n');
 
-    const prompt = `คุณคือนักวิเคราะห์ข่าวเศรษฐกิจและการเงินสถาบัน (Institutional Macro Analyst)
-ช่วยสรุปสถานการณ์ข่าวล่าสุดของคู่เงิน/สินทรัพย์: ${ticker}
-จากข้อมูลข่าวสดต่อไปนี้:
+    const prompt = `คุณคือผู้เชี่ยวชาญการวิเคราะห์ข่าวเศรษฐกิจมหภาคและการเงินโลกสถาบัน (Senior Macro Intelligence Analyst)
+จงวิเคราะห์และสรุปข่าวล่าสุดของคู่เงิน/สินทรัพย์: ${ticker} (${displayName}) เป็น **ภาษาไทยล้วน 100%** (ห้ามมีภาษาอังกฤษปน แปลงคำศัพท์เทคนิคทั้งหมดเป็นภาษาไทยที่อ่านง่ายและชัดเจน)
 
-${newsContext}
+ข้อมูลข่าวสดจากตลาด:
+${newsContext || 'ตลาดเคลื่อนไหวตามแนวโน้มเศรษฐกิจมหภาคและการคาดการณ์ทิศทางดอกเบี้ยของธนาคารกลาง'}
 
-กรุณาสรุปเป็นภาษาไทยให้กระชับ ชัดเจน เข้าใจง่ายที่สุด 3 หัวข้อหลัก โดยใช้รูปแบบ HTML tags (<b>, <i>, •):
+กรุณาสรุปให้สวยงาม เป็นระเบียบ 3 หัวข้อหลัก โดยใช้แท็ก HTML (<b>, <i>, •):
 
-1. 📰 <b>ประเด็นข่าวและปัจจัยขับเคลื่อนหลัก:</b> (สรุปเนื้อหาสำคัญ 2-3 บรรทัดว่าเกิดอะไรขึ้น)
-2. 📊 <b>ทิศทาง Sentiment ตลาด:</b> (ระบุชัดเจนว่าข่าวนี้เป็น บวก (Bullish) / ลบ (Bearish) / เป็นกลาง (Neutral) ต่อ ${ticker} เพราะอะไร)
-3. 🎯 <b>ผลกระทบต่อแนวโน้มราคา:</b> (ประเมินว่าส่งผลต่อแรงซื้อ/แรงขาย และแนวรับแนวต้านสำคัญอย่างไร)`;
+1. 📰 <b>ประเด็นข่าวและปัจจัยขับเคลื่อนหลัก:</b>
+(สรุปประเด็นข่าวเศรษฐกิจโลกและนโยบายธนาคารกลางแบบกระชับ 2-3 บรรทัด เป็นภาษาไทยล้วน)
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 600 },
-      }),
-    });
+2. 📊 <b>ทิศทาง Sentiment ตลาด:</b>
+(ชี้ชัดว่าข่าวนี้ส่งผลบวก (Bullish) หรือลบ (Bearish) หรือเป็นกลาง ต่อ ${ticker} เพราะอะไร เป็นภาษาไทยล้วน)
 
-    if (res.ok) {
-      const data = await res.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text && text.trim().length > 30) {
-        return text.trim();
+3. 🎯 <b>ผลกระทบต่อแนวโน้มราคากราฟ:</b>
+(วิเคราะห์ทิศทางแรงซื้อแรงขายและระดับแนวรับแนวต้านสำคัญ เป็นภาษาไทยล้วน)`;
+
+    for (const model of models) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.15, maxOutputTokens: 1200 },
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text && text.trim().length > 40) {
+            return text.trim();
+          }
+        }
+      } catch (err) {
+        console.warn(`[Gemini Model ${model} failed for ${ticker}]:`, (err as Error).message);
       }
     }
-  } catch (err) {
-    console.error(`[AI News Synthesis Error for ${ticker}]:`, err);
   }
 
-  // Fallback
-  return newsArticles
-    .slice(0, 3)
-    .map((n) => `• <b>${n.headline}</b>\n  <i>${n.summary?.slice(0, 140)}...</i>`)
-    .join('\n\n');
+  // 100% Thai Fallback from Local Thai Dictionary
+  if (enrichedArticles.length > 0) {
+    const list = enrichedArticles
+      .slice(0, 3)
+      .map(
+        (a, i) =>
+          `• <b>${a.thai_headline || a.headline}</b>\n  <i>${a.thai_summary || a.summary}</i>`
+      )
+      .join('\n\n');
+
+    return `1. 📰 <b>ประเด็นข่าวและปัจจัยขับเคลื่อนหลัก:</b>\n${list}\n\n2. 📊 <b>ทิศทาง Sentiment ตลาด:</b>\n• ตลาดเคลื่อนไหวตามกระแสเงินทุนหลักและส่วนต่างอัตราดอกเบี้ยระหว่างประเทศ\n\n3. 🎯 <b>ผลกระทบต่อแนวโน้มราคากราฟ:</b>\n• ติดตามการทดสอบแนวรับแนวต้านสำคัญตามสัญญาณเทคนิคอลในแดชบอร์ด`;
+  }
+
+  return `1. 📰 <b>ประเด็นข่าวและปัจจัยขับเคลื่อนหลัก:</b>\n• ยังไม่มีข่าวด่วนกระทบรุนแรงในรอบ 24 ชั่วโมงที่ผ่านมา ตลาดเคลื่อนไหวตามปัจจัยทางเทคนิคและกระแสเงินทุนหลัก\n\n2. 📊 <b>ทิศทาง Sentiment ตลาด:</b>\n• อารมณ์ตลาดเป็นกลาง (Neutral) เคลื่อนไหวในกรอบสะสมกำลัง\n\n3. 🎯 <b>ผลกระทบต่อแนวโน้มราคา:</b>\n• รอการประกาศตัวเลขเศรษฐกิจสำคัญเพื่อกำหนดทิศทางใหม่`;
 }
 
 /**
@@ -142,7 +158,7 @@ export async function handleTelegramCommand(
     msg += `📋 <b>คำสั่งที่คุณสามารถใช้งานได้:</b>\n`;
     msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
     msg += `📰 <b>/news [คู่เงิน]</b>\n`;
-    msg += `<i>ดึงข่าวสดและให้ AI สรุปสาระสำคัญเป็นภาษาไทย</i>\n`;
+    msg += `<i>ดึงข่าวสดและให้ AI สรุปสาระสำคัญเป็นภาษาไทยล้วน 100%</i>\n`;
     msg += `ตัวอย่าง: <code>/news USDJPY</code> หรือ <code>/news XAUUSD</code>\n\n`;
 
     msg += `🎯 <b>/check [คู่เงิน] หรือ /signal [คู่เงิน]</b>\n`;
@@ -174,19 +190,26 @@ export async function handleTelegramCommand(
       ticker: targetTicker,
       display_name: targetTicker,
       asset_type: (targetTicker.length === 6 ? 'forex' : 'stock') as AssetType,
+      category: 'Custom',
+      is_active: true,
+      alert_threshold: 0.7,
+      finnhub_symbol: targetTicker,
     };
 
-    await sendTelegramReply(chatId, `🔍 <i>กำลังรวบรวมข่าวสดของ ${sym.ticker} และให้ Gemini AI ประมวลผลภาษาไทย กรุณารอสักครู่...</i>`);
+    await sendTelegramReply(
+      chatId,
+      `🔍 <i>กำลังรวบรวมข่าวสดของ ${sym.ticker} และให้ Gemini AI สรุปเป็นภาษาไทยล้วน กรุณารอสักครู่...</i>`
+    );
 
     try {
       const articles = await fetchMarketauxNews([sym.ticker]);
-      const thaiSummary = await synthesizeThaiNews(sym.ticker, articles);
+      const thaiSummary = await synthesizeThaiNews(sym.ticker, sym.display_name, articles);
 
       let msg = `📰 <b>สรุปสถานการณ์ข่าวสด: ${sym.ticker} (${sym.display_name})</b>\n`;
       msg += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
       msg += `${thaiSummary}\n\n`;
       msg += `⏰ <i>อัปเดตเวลา: ${new Date().toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok' })} (เวลาไทย)</i>\n`;
-      msg += `⚡ <i>Nexus Intel Pro • Real-Time AI News Intelligence</i>`;
+      msg += `⚡ <i>Nexus Intel Pro • Real-Time AI News Intelligence (ภาษาไทย 100%)</i>`;
 
       await sendTelegramReply(chatId, msg, QUICK_KEYBOARD);
     } catch (err) {
@@ -209,7 +232,7 @@ export async function handleTelegramCommand(
       asset_type: (targetTicker.length === 6 ? 'forex' : 'stock') as AssetType,
       category: 'Custom',
       is_active: true,
-      alert_threshold: 0.70,
+      alert_threshold: 0.7,
       finnhub_symbol: targetTicker,
     };
 
