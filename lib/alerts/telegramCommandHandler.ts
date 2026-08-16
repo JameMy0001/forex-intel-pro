@@ -11,81 +11,83 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
 /**
- * Send a reply message to Telegram with safe message chunking (max 3900 chars per message)
+ * Format and sanitize text for Telegram HTML parsing
+ */
+function sanitizeTelegramHtml(raw: string): string {
+  let text = raw.trim();
+
+  // Convert Markdown bold **text** to <b>text</b>
+  text = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+
+  // Convert Markdown headers # / ## / ### to bold lines
+  text = text.replace(/^#{1,4}\s*(.*?)$/gm, '<b>$1</b>');
+
+  // Convert Markdown italic *text* or _text_ to <i>text</i>
+  text = text.replace(/(?<!\w)\*([^*\n]+)\*(?!\w)/g, '<i>$1</i>');
+  text = text.replace(/(?<!\w)_([^_\n]+)_(?!\w)/g, '<i>$1</i>');
+
+  // Remove unsupported HTML tags while preserving text
+  text = text.replace(/<\/?(div|p|span|h[1-6]|ul|li|ol|br|hr)[^>]*>/gi, '\n');
+
+  // Clean multiple newlines
+  text = text.replace(/\n{3,}/g, '\n\n');
+
+  return text.trim();
+}
+
+/**
+ * Send a reply message to Telegram with bulletproof HTML parsing and plain-text fallback
  */
 export async function sendTelegramReply(
   chatId: string | number,
-  text: string,
+  rawText: string,
   keyboard?: any
 ): Promise<boolean> {
   if (!TELEGRAM_BOT_TOKEN) return false;
+
+  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+  const sanitizedText = sanitizeTelegramHtml(rawText);
+
   try {
-    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+    // 1. Try sending with sanitized HTML
+    const payload: any = {
+      chat_id: chatId,
+      text: sanitizedText,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+    };
+    if (keyboard) payload.reply_markup = keyboard;
 
-    // If message is short enough, send directly
-    if (text.length <= 3900) {
-      const payload: any = {
-        chat_id: chatId,
-        text,
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
-      };
-      if (keyboard) payload.reply_markup = keyboard;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
 
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      return data.ok;
+    if (data.ok) {
+      return true;
     }
 
-    // Split long message into chunks cleanly at paragraph breaks
-    const chunks: string[] = [];
-    let remaining = text;
+    // 2. If Telegram HTML parser failed, retry immediately as plain text
+    console.warn('[Telegram HTML parsing failed, retrying plain text]:', data.description);
+    const plainText = sanitizedText.replace(/<[^>]*>/g, '');
+    const fallbackPayload: any = {
+      chat_id: chatId,
+      text: plainText,
+      disable_web_page_preview: true,
+    };
+    if (keyboard) fallbackPayload.reply_markup = keyboard;
 
-    while (remaining.length > 0) {
-      if (remaining.length <= 3900) {
-        chunks.push(remaining);
-        break;
-      }
-
-      let splitPos = remaining.lastIndexOf('\n\n', 3900);
-      if (splitPos === -1 || splitPos < 1000) {
-        splitPos = remaining.lastIndexOf('\n', 3900);
-      }
-      if (splitPos === -1 || splitPos < 1000) {
-        splitPos = 3900;
-      }
-
-      chunks.push(remaining.slice(0, splitPos));
-      remaining = remaining.slice(splitPos).trim();
-    }
-
-    let allOk = true;
-    for (let i = 0; i < chunks.length; i++) {
-      const isLast = i === chunks.length - 1;
-      const payload: any = {
-        chat_id: chatId,
-        text: chunks[i],
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
-      };
-      if (isLast && keyboard) payload.reply_markup = keyboard;
-
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!data.ok) allOk = false;
-    }
-
-    return allOk;
+    const retryRes = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(fallbackPayload),
+    });
+    const retryData = await retryRes.json();
+    return retryData.ok;
   } catch (err) {
-    console.error('[Telegram Reply Error]', err);
+    console.error('[Telegram Reply Network Error]:', err);
     return false;
   }
 }
@@ -104,7 +106,7 @@ export const QUICK_KEYBOARD = {
 };
 
 /**
- * Synthesize real-time news into in-depth, verified Institutional Thai intelligence report
+ * Synthesize real-time news into detailed, verified Institutional Thai intelligence report
  */
 async function synthesizeThaiNews(
   ticker: string,
@@ -115,7 +117,7 @@ async function synthesizeThaiNews(
   const enrichedArticles = newsArticles.map((a) => enrichArticleWithThaiSummary(a));
 
   // Build verified news citations context
-  const newsContext = enrichedArticles.slice(0, 6).map((a, idx) => {
+  const newsContext = enrichedArticles.slice(0, 5).map((a, idx) => {
     const pubDate = a.published_at
       ? new Date(a.published_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Bangkok' })
       : 'วันนี้';
@@ -126,7 +128,6 @@ async function synthesizeThaiNews(
       time: pubDate,
       headline: a.thai_headline || a.headline,
       summary: a.thai_summary || a.summary,
-      url: a.url || '',
     };
   });
 
@@ -134,10 +135,10 @@ async function synthesizeThaiNews(
     ? newsContext
         .map(
           (n) =>
-            `[ข่าวที่ ${n.index}] แหล่งข่าว: ${n.source} (${n.time})\nหัวข้อ: ${n.headline}\nสาระสำคัญ: ${n.summary}`
+            `[ข่าวที่ ${n.index}] สำนักข่าว: ${n.source} (${n.time})\nหัวข้อ: ${n.headline}\nเนื้อหา: ${n.summary}`
         )
         .join('\n\n')
-    : `ตลาดเคลื่อนไหวตามส่วนต่างอัตราดอกเบี้ยและนโยบายการเงินของธนาคารกลาง`;
+    : `ตลาดเคลื่อนไหวตามแนวโน้มเศรษฐกิจมหภาคและส่วนต่างอัตราดอกเบี้ยของธนาคารกลาง`;
 
   if (GEMINI_API_KEY) {
     const models = ['gemini-flash-lite-latest', 'gemini-3.5-flash', 'gemini-3.7-flash'];
@@ -149,7 +150,7 @@ async function synthesizeThaiNews(
 ข้อมูลข่าวและเหตุการณ์สดจากสำนักข่าวชั้นนำ:
 ${newsContextText}
 
-กรุณาสรุปรายงานเป็น **ภาษาไทยล้วน 100%** ที่ละเอียด ครบถ้วน เจาะลึก มีเหตุผลรองรับชัดเจน สมบูรณ์ ห้ามตัดทอนข้อความ โดยจัดรูปแบบให้อ่านง่าย สบายตา สวยงาม ด้วยแท็ก HTML (<b>, <i>, •, <code>) แบ่งเป็น 4 ส่วนหลัก:
+กรุณาสรุปรายงานเป็น **ภาษาไทยล้วน 100%** ที่ละเอียด เจาะลึก มีเหตุผลรองรับชัดเจน และจัดรูปแบบให้อ่านง่าย สบายตา สวยงาม ด้วยแท็ก HTML (<b>, <i>, •, <code>) โดยแบ่งเป็น 4 ส่วนหลัก:
 
 🏛️ <b>1. สรุปภาพรวมและปัจจัยขับเคลื่อนเศรษฐกิจมหภาค (Macro Landscape):</b>
 (อธิบายอย่างละเอียดและครบถ้วน: นโยบายดอกเบี้ยธนาคารกลางสหรัฐฯ (Fed) vs ธนาคารกลางคู่สัญญา, ส่วนต่างอัตราผลตอบแทนพันธบัตร (Yield Spread), และทิศทางเงินเฟ้อ 4-5 บรรทัด)
@@ -173,7 +174,7 @@ ${newsContextText}
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
               temperature: 0.15,
-              maxOutputTokens: 2800,
+              maxOutputTokens: 2500,
             },
           }),
         });
