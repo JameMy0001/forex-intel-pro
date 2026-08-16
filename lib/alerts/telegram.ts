@@ -1,15 +1,23 @@
 import { SignalOutput, AIAnalysisOutput } from '../types';
 
+import { getActiveSubscribers } from '../db/localDb';
+
 export async function sendTelegramSignalAlert(
   signal: SignalOutput,
   aiAnalysis?: AIAnalysisOutput
-): Promise<{ success: boolean; messageId?: number; error?: string }> {
+): Promise<{ success: boolean; messageId?: number; count?: number; error?: string }> {
   const token = process.env.TELEGRAM_BOT_TOKEN || '';
-  const chatId = process.env.TELEGRAM_CHAT_ID || '';
+  const defaultChatId = process.env.TELEGRAM_CHAT_ID || '6270422059';
 
-  if (!token || !chatId) {
-    console.warn('[Telegram Alert] TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not configured.');
+  if (!token) {
+    console.warn('[Telegram Alert] TELEGRAM_BOT_TOKEN not configured.');
     return { success: false, error: 'Telegram credentials missing' };
+  }
+
+  // Get all active subscribers from Turso Cloud DB
+  let subscribers = await getActiveSubscribers();
+  if (subscribers.length === 0 && defaultChatId) {
+    subscribers = [{ chat_id: defaultChatId, is_active: true, subscribed_at: new Date().toISOString(), last_active_at: new Date().toISOString() }];
   }
 
   const isBuy = signal.direction.includes('BUY');
@@ -54,27 +62,36 @@ export async function sendTelegramSignalAlert(
   text += `⏰ <i>เวลาบันทึกสัญญาณ: ${new Date().toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok' })} (เวลาไทย)</i>\n`;
   text += `⚡ <i>Nexus Intel Pro • Institutional Quantitative Engine</i>`;
 
-  try {
-    const url = `https://api.telegram.org/bot${token}/sendMessage`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: text,
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
-      }),
-    });
+  const url = `https://api.telegram.org/bot${token}/sendMessage`;
+  let successCount = 0;
+  let lastMessageId: number | undefined;
 
-    const data = await res.json();
-    if (data.ok) {
-      return { success: true, messageId: data.result.message_id };
-    }
-    return { success: false, error: data.description || 'Failed to send message' };
-  } catch (err) {
-    return { success: false, error: (err as Error).message };
-  }
+  // Broadcast to all active subscribers concurrently
+  await Promise.all(
+    subscribers.map(async (sub) => {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: sub.chat_id,
+            text: text,
+            parse_mode: 'HTML',
+            disable_web_page_preview: true,
+          }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          successCount++;
+          lastMessageId = data.result?.message_id;
+        }
+      } catch (err) {
+        console.error(`[Telegram Broadcast Error to ${sub.chat_id}]:`, err);
+      }
+    })
+  );
+
+  return { success: successCount > 0, count: successCount, messageId: lastMessageId };
 }
 
 /**

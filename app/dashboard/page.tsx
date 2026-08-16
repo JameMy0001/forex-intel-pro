@@ -14,6 +14,8 @@ import {
   Radio,
   CheckCircle2,
   AlertCircle,
+  Users,
+  Send,
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -25,16 +27,19 @@ export default function DashboardPage() {
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [broadcastingTicker, setBroadcastingTicker] = useState<string | null>(null);
+  const [subscriberCount, setSubscriberCount] = useState<number>(1);
 
   const fetchSignals = useCallback(async (isManual = false) => {
     if (isManual) setIsRefreshing(true);
     try {
-      const [res, settingsRes] = await Promise.all([
+      const [res, settingsRes, subsRes] = await Promise.all([
         fetch('/api/signals'),
         fetch('/api/settings'),
+        fetch('/api/subscribers').catch(() => ({ json: () => ({ count: 1 }) })),
       ]);
       const json = await res.json();
       const settingsJson = await settingsRes.json();
+      const subsJson = await subsRes.json();
 
       if (json.success && Array.isArray(json.data)) {
         setData(json.data);
@@ -43,6 +48,9 @@ export default function DashboardPage() {
       }
       if (settingsJson.success && settingsJson.settings) {
         setFocusSymbol(settingsJson.settings.focus_symbol || 'ALL');
+      }
+      if (subsJson && typeof subsJson.count === 'number') {
+        setSubscriberCount(subsJson.count);
       }
     } catch (err) {
       console.error('Failed to load signals:', err);
@@ -125,9 +133,20 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono">
+          {/* Active Telegram Subscribers Counter */}
+          <a
+            href="/settings"
+            title="ดูรายชื่อสมาชิกรับการแจ้งเตือน"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0e1628] hover:bg-[#131e36] border border-blue-500/25 text-xs font-mono text-blue-300 transition-all shadow-sm group"
+          >
+            <Users className="w-3.5 h-3.5 text-blue-400 group-hover:scale-110 transition-transform" />
+            <span>สมาชิก Telegram: <strong className="text-white font-bold">{subscriberCount}</strong> คน</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
+          </a>
+
+          <div className="hidden md:flex items-center gap-1.5 text-xs text-slate-400 font-mono">
             <Clock className="w-3.5 h-3.5 text-slate-500" />
-            <span>อัปเดตล่าสุด: {lastUpdated || 'กำลังโหลด...'}</span>
+            <span>อัปเดต: {lastUpdated || 'กำลังโหลด...'}</span>
           </div>
 
           <button

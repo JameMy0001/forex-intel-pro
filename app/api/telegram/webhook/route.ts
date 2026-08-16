@@ -17,15 +17,12 @@ export async function POST(request: Request) {
       const chatId = String(update.message.chat.id);
       const text = update.message.text;
       const firstName = update.message.from?.first_name || 'Trader';
+      const username = update.message.from?.username
+        ? `@${update.message.from.username}`
+        : undefined;
 
-      // Security check: Only allow the authorized user/chat
-      if (ALLOWED_CHAT_ID && chatId !== ALLOWED_CHAT_ID && !ALLOWED_CHAT_ID.includes(chatId)) {
-        console.warn(`[Telegram Webhook] Unauthorized message from chat_id ${chatId}`);
-        return NextResponse.json({ ok: true, ignored: true });
-      }
-
-      // Process command
-      await handleTelegramCommand(text, chatId, firstName);
+      // Process command for subscriber
+      await handleTelegramCommand(text, chatId, firstName, username);
     }
 
     return NextResponse.json({ ok: true });

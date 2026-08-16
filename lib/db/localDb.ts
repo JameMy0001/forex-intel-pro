@@ -154,6 +154,17 @@ export async function ensureTables(): Promise<void> {
         );
       `);
 
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS telegram_subscribers (
+          chat_id TEXT PRIMARY KEY,
+          first_name TEXT,
+          username TEXT,
+          subscribed_at TEXT DEFAULT (datetime('now')),
+          is_active INTEGER DEFAULT 1,
+          last_active_at TEXT DEFAULT (datetime('now'))
+        );
+      `);
+
       // Seed default settings
       try {
         await db.execute(`
@@ -162,6 +173,12 @@ export async function ensureTables(): Promise<void> {
           ('min_alert_probability', '0.70'),
           ('telegram_enabled', 'true'),
           ('active_symbols', '["EURUSD","GBPUSD","USDJPY","GBPJPY","EURJPY","AUDUSD","USDCHF","USDCAD","XAUUSD","AAPL","NVDA","TSLA","MSFT","AMZN","GOOGL","SPY"]')
+        `);
+
+        // Seed default admin subscriber
+        await db.execute(`
+          INSERT OR IGNORE INTO telegram_subscribers (chat_id, first_name, username, is_active)
+          VALUES ('6270422059', 'Jame (Admin)', 'Owner', 1)
         `);
       } catch (e) {}
 
@@ -397,6 +414,114 @@ export async function updateSystemSettings(newSettings: Partial<SystemSettingsSt
   } catch (err) {
     console.error('[DB] Error updating system settings:', err);
     return await getSystemSettings();
+  }
+}
+
+export interface TelegramSubscriber {
+  chat_id: string;
+  first_name?: string;
+  username?: string;
+  subscribed_at: string;
+  is_active: boolean;
+  last_active_at: string;
+}
+
+/**
+ * Register or update an active subscriber
+ */
+export async function upsertSubscriber(
+  chatId: string,
+  firstName?: string,
+  username?: string
+): Promise<void> {
+  try {
+    await ensureTables();
+    const db = getDbClient();
+    await db.execute({
+      sql: `INSERT INTO telegram_subscribers (chat_id, first_name, username, is_active, last_active_at, subscribed_at)
+            VALUES (?, ?, ?, 1, datetime('now'), datetime('now'))
+            ON CONFLICT(chat_id) DO UPDATE SET
+              first_name = COALESCE(excluded.first_name, telegram_subscribers.first_name),
+              username = COALESCE(excluded.username, telegram_subscribers.username),
+              is_active = 1,
+              last_active_at = datetime('now')`,
+      args: [String(chatId), firstName || null, username || null],
+    });
+  } catch (err) {
+    console.error('[DB] Failed to upsert subscriber:', err);
+  }
+}
+
+/**
+ * Get all active subscribers for alert broadcasting
+ */
+export async function getActiveSubscribers(): Promise<TelegramSubscriber[]> {
+  try {
+    await ensureTables();
+    const db = getDbClient();
+    const res = await db.execute('SELECT * FROM telegram_subscribers WHERE is_active = 1 ORDER BY subscribed_at DESC');
+    return res.rows.map((r: any) => ({
+      chat_id: String(r.chat_id),
+      first_name: r.first_name ? String(r.first_name) : undefined,
+      username: r.username ? String(r.username) : undefined,
+      subscribed_at: String(r.subscribed_at),
+      is_active: Boolean(r.is_active),
+      last_active_at: String(r.last_active_at),
+    }));
+  } catch (err) {
+    console.error('[DB] Failed to get active subscribers:', err);
+    return [];
+  }
+}
+
+/**
+ * Get total count of active subscribers
+ */
+export async function getSubscriberCount(): Promise<number> {
+  try {
+    await ensureTables();
+    const db = getDbClient();
+    const res = await db.execute('SELECT COUNT(*) as count FROM telegram_subscribers WHERE is_active = 1');
+    return Number(res.rows[0]?.count || 0);
+  } catch (err) {
+    return 1;
+  }
+}
+
+/**
+ * Deactivate a subscriber (when user sends /stop or /unsubscribe)
+ */
+export async function deactivateSubscriber(chatId: string): Promise<void> {
+  try {
+    await ensureTables();
+    const db = getDbClient();
+    await db.execute({
+      sql: `UPDATE telegram_subscribers SET is_active = 0, last_active_at = datetime('now') WHERE chat_id = ?`,
+      args: [String(chatId)],
+    });
+  } catch (err) {
+    console.error('[DB] Failed to deactivate subscriber:', err);
+  }
+}
+
+/**
+ * Get all subscribers (both active and inactive) for admin view
+ */
+export async function getAllSubscribers(): Promise<TelegramSubscriber[]> {
+  try {
+    await ensureTables();
+    const db = getDbClient();
+    const res = await db.execute('SELECT * FROM telegram_subscribers ORDER BY last_active_at DESC');
+    return res.rows.map((r: any) => ({
+      chat_id: String(r.chat_id),
+      first_name: r.first_name ? String(r.first_name) : undefined,
+      username: r.username ? String(r.username) : undefined,
+      subscribed_at: String(r.subscribed_at),
+      is_active: Boolean(r.is_active),
+      last_active_at: String(r.last_active_at),
+    }));
+  } catch (err) {
+    return [];
   }
 }
 

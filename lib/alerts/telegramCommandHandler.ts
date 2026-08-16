@@ -2,13 +2,14 @@ import { fetchLiveQuote, fetchCandleHistory } from '../ingestion/finnhubClient';
 import { fetchMarketauxNews } from '../ingestion/marketauxClient';
 import { computeTechnicalIndicators } from '../signal-engine/indicators';
 import { calculateProbabilityScore } from '../signal-engine/probability';
-import { getSystemSettings, updateSystemSettings } from '../db/localDb';
+import { getSystemSettings, updateSystemSettings, upsertSubscriber, deactivateSubscriber } from '../db/localDb';
 import { DEFAULT_SYMBOLS } from '../constants/defaultSymbols';
 import { enrichArticleWithThaiSummary } from '../ingestion/thaiNewsHelper';
 import { AssetType, NewsArticle } from '../types';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+const ADMIN_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '6270422059';
 
 /**
  * Format and sanitize text for Telegram HTML parsing
@@ -219,12 +220,17 @@ ${sourcesList || '• <i>Bloomberg / Reuters / Marketaux Real-time Macro Intelli
 export async function handleTelegramCommand(
   rawText: string,
   chatId: string | number,
-  userName: string = 'Trader'
+  userName: string = 'Trader',
+  username?: string
 ): Promise<void> {
+  const strChatId = String(chatId);
   const text = rawText.trim();
   const parts = text.split(/\s+/);
   const command = parts[0].toLowerCase().split('@')[0]; // strip @botname if in group
   const arg = parts[1] ? parts[1].toUpperCase() : '';
+
+  // Auto enroll / update active subscriber in Turso Cloud DB
+  await upsertSubscriber(strChatId, userName, username);
 
   // 1. /start or /help
   if (command === '/start' || command === '/help') {
@@ -240,23 +246,34 @@ export async function handleTelegramCommand(
     msg += `<i>ตรวจราคา, วินเรท %, สัญญาณ Buy/Sell และค่า MT5 สดๆ</i>\n`;
     msg += `ตัวอย่าง: <code>/check USDJPY</code>\n\n`;
 
-    msg += `🎯 <b>/focus [คู่เงิน]</b>\n`;
-    msg += `<i>ล็อคระบบให้คำนวณและแจ้งเตือนเฉพาะคู่เงินนั้นๆ</i>\n`;
-    msg += `ตัวอย่าง: <code>/focus USDJPY</code> หรือ <code>/focus ALL</code>\n\n`;
-
-    msg += `🛡️ <b>/winrate [เลข %]</b>\n`;
-    msg += `<i>ปรับเกณฑ์วินเรทขั้นต่ำในการแจ้งเตือน</i>\n`;
-    msg += `ตัวอย่าง: <code>/winrate 80</code> หรือ <code>/winrate 75</code>\n\n`;
-
     msg += `📊 <b>/status</b>\n`;
     msg += `<i>ตรวจเช็คการตั้งค่าและสถานะระบบคลาวด์ปัจจุบัน</i>\n\n`;
+
+    if (strChatId === ADMIN_CHAT_ID) {
+      msg += `👑 <b>คำสั่งสำหรับผู้ดูแลระบบ (Admin Only):</b>\n`;
+      msg += `• <code>/focus [คู่เงิน]</code> — ล็อคคู่เงินเฉพาะ\n`;
+      msg += `• <code>/winrate [เลข %]</code> — ปรับเกณฑ์วินเรทแจ้งเตือน\n\n`;
+    }
+
+    msg += `🛑 <b>/stop</b>\n`;
+    msg += `<i>ยกเลิกการรับแจ้งเตือนอัตโนมัติ</i>\n\n`;
     msg += `💡 <i>แตะปุ่มลัดด้านล่างแป้นพิมพ์เพื่อสั่งงานได้ทันทีครับ!</i>`;
 
     await sendTelegramReply(chatId, msg, QUICK_KEYBOARD);
     return;
   }
 
-  // 2. /news [SYMBOL]
+  // 2. /stop or /unsubscribe
+  if (command === '/stop' || command === '/unsubscribe') {
+    await deactivateSubscriber(strChatId);
+    await sendTelegramReply(
+      chatId,
+      `🛑 <b>ยกเลิกการรับแจ้งเตือนสำเร็จ:</b>\n\nคุณจะไม่ได้รับการแจ้งเตือนอัตโนมัติอีกต่อไป (สามารถพิมพ์ <b>/start</b> ได้ทุกเมื่อหากต้องการกลับมารับแจ้งเตือนใหม่ครับ)`
+    );
+    return;
+  }
+
+  // 3. /news [SYMBOL]
   if (command === '/news') {
     const targetTicker = arg || 'USDJPY';
     const sym = DEFAULT_SYMBOLS.find(
@@ -302,7 +319,7 @@ export async function handleTelegramCommand(
     return;
   }
 
-  // 3. /check [SYMBOL] or /signal [SYMBOL]
+  // 4. /check [SYMBOL] or /signal [SYMBOL]
   if (command === '/check' || command === '/signal' || command === '/price') {
     const targetTicker = arg || 'USDJPY';
     const sym = DEFAULT_SYMBOLS.find(
@@ -374,8 +391,17 @@ export async function handleTelegramCommand(
     return;
   }
 
-  // 4. /focus [SYMBOL]
+  // 5. /focus [SYMBOL] (Admin Only)
   if (command === '/focus') {
+    if (strChatId !== ADMIN_CHAT_ID) {
+      await sendTelegramReply(
+        chatId,
+        `⚠️ <b>ขออภัยครับ:</b> คำสั่งตั้งค่าระบบสงวนสิทธิ์เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นครับ\n\nคุณสามารถใช้งานคำสั่งวิเคราะห์ข่าวและสัญญาณเทรดได้ เช่น <code>/news USDJPY</code> หรือ <code>/check USDJPY</code> ครับ`,
+        QUICK_KEYBOARD
+      );
+      return;
+    }
+
     if (!arg) {
       const settings = await getSystemSettings();
       await sendTelegramReply(
@@ -396,8 +422,17 @@ export async function handleTelegramCommand(
     return;
   }
 
-  // 5. /winrate [PERCENT]
+  // 6. /winrate [PERCENT] (Admin Only)
   if (command === '/winrate' || command === '/threshold') {
+    if (strChatId !== ADMIN_CHAT_ID) {
+      await sendTelegramReply(
+        chatId,
+        `⚠️ <b>ขออภัยครับ:</b> คำสั่งตั้งค่าระบบสงวนสิทธิ์เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นครับ\n\nคุณสามารถใช้งานคำสั่งวิเคราะห์ข่าวและสัญญาณเทรดได้ เช่น <code>/news USDJPY</code> หรือ <code>/check USDJPY</code> ครับ`,
+        QUICK_KEYBOARD
+      );
+      return;
+    }
+
     const valNum = parseFloat(arg);
     if (isNaN(valNum) || valNum < 50 || valNum > 95) {
       const settings = await getSystemSettings();
@@ -419,7 +454,7 @@ export async function handleTelegramCommand(
     return;
   }
 
-  // 6. /status
+  // 7. /status
   if (command === '/status') {
     const settings = await getSystemSettings();
     let msg = `📊 <b>สถานะระบบ NEXUS INTEL PRO 2.0</b>\n`;

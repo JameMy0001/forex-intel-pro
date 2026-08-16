@@ -16,6 +16,7 @@ import {
   Unlock,
   Sliders,
   Check,
+  Users,
 } from 'lucide-react';
 import { DEFAULT_SYMBOLS } from '@/lib/constants/defaultSymbols';
 import { SymbolInfo } from '@/lib/types';
@@ -31,6 +32,11 @@ export default function SettingsPage() {
   const [activeSymbols, setActiveSymbols] = useState<string[]>(DEFAULT_SYMBOLS.map((s) => s.ticker));
   const [savingSettings, setSavingSettings] = useState<boolean>(false);
   const [saveToast, setSaveToast] = useState<string | null>(null);
+
+  // Telegram Subscribers State
+  const [subscribers, setSubscribers] = useState<any[]>([]);
+  const [subscriberCount, setSubscriberCount] = useState<number>(1);
+  const [loadingSubscribers, setLoadingSubscribers] = useState<boolean>(true);
 
   // Master Password Change State
   const [newPassword, setNewPassword] = useState('');
@@ -77,8 +83,13 @@ export default function SettingsPage() {
   useEffect(() => {
     async function loadSettings() {
       try {
-        const res = await fetch('/api/settings');
+        const [res, subsRes] = await Promise.all([
+          fetch('/api/settings'),
+          fetch('/api/subscribers').catch(() => ({ json: () => ({ count: 1, subscribers: [] }) })),
+        ]);
         const json = await res.json();
+        const subsJson = await subsRes.json();
+
         if (json.success && json.settings) {
           setFocusSymbol(json.settings.focus_symbol || 'ALL');
           setMinAlertProbability(json.settings.min_alert_probability || 0.70);
@@ -87,8 +98,15 @@ export default function SettingsPage() {
             setActiveSymbols(json.settings.active_symbols);
           }
         }
+
+        if (subsJson.success) {
+          setSubscribers(subsJson.subscribers || []);
+          setSubscriberCount(subsJson.count || 1);
+        }
       } catch (err) {
         console.error('Failed to load settings:', err);
+      } finally {
+        setLoadingSubscribers(false);
       }
     }
     loadSettings();
@@ -521,6 +539,89 @@ export default function SettingsPage() {
             <span>{changingPass ? 'กำลังบันทึก...' : 'บันทึกรหัสผ่านใหม่'}</span>
           </button>
         </form>
+      </div>
+
+      {/* 6. TELEGRAM SUBSCRIBERS BROADCAST MANAGER */}
+      <div className="terminal-card p-5 space-y-4 border-blue-900/60 bg-[#0c1220]">
+        <div className="flex items-center justify-between border-b border-[#1e293b] pb-3">
+          <div className="flex items-center gap-2">
+            <Users className="w-5 h-5 text-blue-400" />
+            <div>
+              <h2 className="text-sm font-bold text-white font-mono uppercase flex items-center gap-2">
+                TELEGRAM SUBSCRIBERS (สมาชิกผู้รับการแจ้งเตือน)
+                <span className="text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                  {subscriberCount} สมาชิกที่ใช้งานอยู่
+                </span>
+              </h2>
+              <p className="text-xs text-slate-400">
+                รายชื่อผู้ใช้งานและเพื่อนๆ ที่กดรับการแจ้งเตือนสัญญาณเทรดผ่านบอท Telegram
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {loadingSubscribers ? (
+          <div className="p-4 text-center text-xs text-slate-500 font-mono">กำลังโหลดรายชื่อสมาชิก...</div>
+        ) : subscribers.length === 0 ? (
+          <div className="p-4 text-center text-xs text-slate-400 font-mono">
+            ยังไม่มีสมาชิกลงทะเบียน (เมื่อมีผู้กด /start กับบอท รายชื่อจะปรากฏที่นี่อัตโนมัติ)
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs font-mono text-left">
+              <thead>
+                <tr className="border-b border-[#1e293b] text-slate-400">
+                  <th className="pb-2 font-semibold">ผู้ใช้งาน (User / Name)</th>
+                  <th className="pb-2 font-semibold">Telegram ID</th>
+                  <th className="pb-2 font-semibold">วันที่เริ่มรับข่าว</th>
+                  <th className="pb-2 font-semibold text-right">สถานะการรับสัญญาณ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#1e293b]/50">
+                {subscribers.map((sub, idx) => (
+                  <tr key={sub.chat_id || idx} className="hover:bg-white/[0.02]">
+                    <td className="py-2.5 text-white font-medium flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-[10px] text-blue-400 font-bold">
+                        {(sub.first_name || 'U').charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <span>{sub.first_name || 'Trader'}</span>
+                        {sub.username && (
+                          <span className="text-slate-400 text-[10px] block">{sub.username}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-2.5 text-slate-400 font-mono">
+                      <code>{sub.chat_id}</code>
+                    </td>
+                    <td className="py-2.5 text-slate-400">
+                      {sub.subscribed_at ? new Date(sub.subscribed_at).toLocaleDateString('th-TH') : 'วันนี้'}
+                    </td>
+                    <td className="py-2.5 text-right">
+                      {sub.is_active ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-800/80 px-2 py-0.5 rounded-full">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          เปิดรับสัญญาณ (Active 🟢)
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-slate-500 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-full">
+                          ปิดชั่วคราว (Paused 🔴)
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="p-3 rounded-lg bg-blue-950/30 border border-blue-500/20 text-xs text-blue-300 font-mono flex items-center gap-2">
+          <Send className="w-4 h-4 text-blue-400 shrink-0" />
+          <span>
+            เมื่อมีสัญญาณเทรด Win Rate $\ge$ {((minAlertProbability || 0.7) * 100).toFixed(0)}% ระบบจะส่งข้อความแจ้งเตือนหาทุกคนในรายชื่อนี้พร้อมกันทันที
+          </span>
+        </div>
       </div>
     </div>
   );
