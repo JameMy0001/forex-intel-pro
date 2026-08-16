@@ -3,7 +3,7 @@ import { DEFAULT_SYMBOLS } from '@/lib/constants/defaultSymbols';
 import { fetchLiveQuote, fetchCandleHistory } from '@/lib/ingestion/finnhubClient';
 import { getCachedDailyNews } from '@/lib/ingestion/newsCache';
 import { computeTechnicalIndicators } from '@/lib/signal-engine/indicators';
-import { calculateProbabilityScore } from '@/lib/signal-engine/probability';
+import { calculateProbabilityScore, applyProbabilityPenalty } from '@/lib/signal-engine/probability';
 import { generateAIAnalysis } from '@/lib/signal-engine/aiAnalyst';
 
 export const dynamic = 'force-dynamic';
@@ -40,19 +40,23 @@ export async function GET(request: Request) {
     // Parallel fetch & compute signals
     const signalPromises = symbols.map(async (sym) => {
       try {
-        const [quote, candles] = await Promise.all([
+        const [quote, candles1D, candles4H] = await Promise.all([
           fetchLiveQuote(sym.ticker, sym.asset_type),
           fetchCandleHistory(sym.ticker, sym.asset_type, 'D', 60),
+          fetchCandleHistory(sym.ticker, sym.asset_type, '240', 80), // 4H timeframe
         ]);
 
-        const indicators = computeTechnicalIndicators(candles, sym.ticker, '1D');
+        const indicators = computeTechnicalIndicators(candles1D, sym.ticker, '1D');
+        const indicators4H = candles4H.length > 30 ? computeTechnicalIndicators(candles4H, sym.ticker, '4H') : undefined;
+
         const signal = calculateProbabilityScore(
           sym.ticker,
           quote.price,
           quote.change_percent || 0,
           sym.asset_type,
           indicators,
-          newsArticles
+          newsArticles,
+          indicators4H
         );
 
         return {
@@ -80,6 +84,39 @@ export async function GET(request: Request) {
       const bConviction = Math.abs(b!.signal.probability_score - 0.5);
       return bConviction - aConviction;
     });
+
+    // Portfolio Correlation Risk Adjustments
+    let usdBullCount = 0;
+    let usdBearCount = 0;
+    
+    // 1st Pass: Count USD correlation direction
+    for (const item of filteredResults) {
+      if (item && item.signal.ticker.includes('USD')) {
+        const isUsdBase = item.signal.ticker.startsWith('USD'); // e.g. USDJPY
+        const isBullish = item.signal.direction.includes('BUY');
+        
+        if ((isUsdBase && isBullish) || (!isUsdBase && !isBullish)) {
+          usdBullCount++;
+        } else {
+          usdBearCount++;
+        }
+      }
+    }
+
+    // 2nd Pass: Penalize if over-exposed to USD
+    for (const item of filteredResults) {
+      if (item && item.signal.ticker.includes('USD')) {
+        const isUsdBase = item.signal.ticker.startsWith('USD');
+        const isBullish = item.signal.direction.includes('BUY');
+        const isUsdBullTrade = (isUsdBase && isBullish) || (!isUsdBase && !isBullish);
+        
+        if (isUsdBullTrade && usdBullCount >= 3) {
+           item.signal = applyProbabilityPenalty(item.signal, 0.9, '[⚠️ High USD Correlation Risk: Reduced Size]');
+        } else if (!isUsdBullTrade && usdBearCount >= 3) {
+           item.signal = applyProbabilityPenalty(item.signal, 0.9, '[⚠️ High USD Correlation Risk: Reduced Size]');
+        }
+      }
+    }
 
     // Save to Turso / SQLite Database
     try {

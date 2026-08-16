@@ -11,6 +11,11 @@ interface LiveNewsFeedProps {
 export const LiveNewsFeed: React.FC<LiveNewsFeedProps> = ({ articles }) => {
   const [sentimentFilter, setSentimentFilter] = useState<'all' | 'Bullish' | 'Bearish'>('all');
   const [showOriginalLang, setShowOriginalLang] = useState<boolean>(false);
+  const [mounted, setMounted] = useState<boolean>(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const filteredArticles = articles.filter((a) => {
     if (sentimentFilter === 'all') return true;
@@ -153,7 +158,7 @@ export const LiveNewsFeed: React.FC<LiveNewsFeedProps> = ({ articles }) => {
                 <div className="flex items-center text-[10px] text-slate-500 gap-1 font-mono">
                   <Clock className="w-3 h-3" />
                   <span>
-                    {timeAgo < 60 ? `${timeAgo} นาทีที่แล้ว` : `${Math.floor(timeAgo / 60)} ชม. ที่แล้ว`}
+                    {mounted ? (timeAgo < 60 ? `${timeAgo} นาทีที่แล้ว` : `${Math.floor(timeAgo / 60)} ชม. ที่แล้ว`) : '...'}
                   </span>
                 </div>
               </div>

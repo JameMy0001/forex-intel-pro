@@ -30,17 +30,19 @@ export default function DashboardPage() {
   const [broadcastingTicker, setBroadcastingTicker] = useState<string | null>(null);
   const [subscriberCount, setSubscriberCount] = useState<number>(1);
 
-  const fetchSignals = useCallback(async (isManual = false) => {
+  const fetchSignals = useCallback(async (isManual = false, abortSignal?: AbortSignal) => {
     if (isManual) setIsRefreshing(true);
     try {
       const [res, settingsRes, subsRes] = await Promise.all([
-        fetch('/api/signals'),
-        fetch('/api/settings'),
-        fetch('/api/subscribers').catch(() => ({ json: () => ({ count: 1 }) })),
+        fetch('/api/signals', { signal: abortSignal }),
+        fetch('/api/settings', { signal: abortSignal }),
+        fetch('/api/subscribers', { signal: abortSignal }).catch(() => ({ json: () => ({ count: 1 }) })),
       ]);
       const json = await res.json();
       const settingsJson = await settingsRes.json();
       const subsJson = await subsRes.json();
+
+      if (abortSignal?.aborted) return;
 
       if (json.success && Array.isArray(json.data)) {
         setData(json.data);
@@ -53,23 +55,32 @@ export default function DashboardPage() {
       if (subsJson && typeof subsJson.count === 'number') {
         setSubscriberCount(subsJson.count);
       }
-    } catch (err) {
-      console.error('Failed to load signals:', err);
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        console.error('Failed to load signals:', err);
+      }
     } finally {
-      setLoading(false);
-      setIsRefreshing(false);
+      if (!abortSignal?.aborted) {
+        setLoading(false);
+        setIsRefreshing(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    fetchSignals();
+    const controller = new AbortController();
+    
+    fetchSignals(false, controller.signal);
 
     // Auto refresh interval every 30 seconds
     const interval = setInterval(() => {
-      fetchSignals();
+      fetchSignals(false, controller.signal);
     }, 30000);
 
-    return () => clearInterval(interval);
+    return () => {
+      controller.abort();
+      clearInterval(interval);
+    };
   }, [fetchSignals]);
 
   const handleBroadcastAlert = async (row: WatchlistRowData) => {

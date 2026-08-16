@@ -278,15 +278,12 @@ export async function handleTelegramCommand(
     const targetTicker = arg || 'USDJPY';
     const sym = DEFAULT_SYMBOLS.find(
       (s) => s.ticker === targetTicker || s.ticker.replace('/', '') === targetTicker
-    ) || {
-      ticker: targetTicker,
-      display_name: targetTicker,
-      asset_type: (targetTicker.length === 6 ? 'forex' : 'stock') as AssetType,
-      category: 'Custom',
-      is_active: true,
-      alert_threshold: 0.7,
-      finnhub_symbol: targetTicker,
-    };
+    );
+    
+    if (!sym) {
+      await sendTelegramReply(chatId, `❌ <b>ข้อผิดพลาด:</b> ไม่พบสินทรัพย์ <code>${targetTicker}</code> ในระบบ\n\nกรุณาใช้สัญลักษณ์มาตรฐาน เช่น USDJPY, XAUUSD, BTCUSD, AAPL`, QUICK_KEYBOARD);
+      return;
+    }
 
     await sendTelegramReply(
       chatId,
@@ -324,15 +321,12 @@ export async function handleTelegramCommand(
     const targetTicker = arg || 'USDJPY';
     const sym = DEFAULT_SYMBOLS.find(
       (s) => s.ticker === targetTicker || s.ticker.replace('/', '') === targetTicker
-    ) || {
-      ticker: targetTicker,
-      display_name: targetTicker,
-      asset_type: (targetTicker.length === 6 ? 'forex' : 'stock') as AssetType,
-      category: 'Custom',
-      is_active: true,
-      alert_threshold: 0.7,
-      finnhub_symbol: targetTicker,
-    };
+    );
+    
+    if (!sym) {
+      await sendTelegramReply(chatId, `❌ <b>ข้อผิดพลาด:</b> ไม่พบสินทรัพย์ <code>${targetTicker}</code> ในระบบ\n\nกรุณาใช้สัญลักษณ์มาตรฐาน เช่น USDJPY, XAUUSD, BTCUSD, AAPL`, QUICK_KEYBOARD);
+      return;
+    }
 
     await sendTelegramReply(chatId, `⚡ <i>กำลังดึงราคาและคำนวณสัญญาณเทคนิคสดของ ${sym.ticker}...</i>`);
 

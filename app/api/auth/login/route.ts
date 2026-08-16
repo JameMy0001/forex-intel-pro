@@ -15,6 +15,8 @@ export async function POST(request: Request) {
 
     const isValid = await verifyPassword(password);
     if (!isValid) {
+      // Artificial delay to mitigate brute-force attacks
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       return NextResponse.json(
         { success: false, error: 'รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง' },
         { status: 401 }

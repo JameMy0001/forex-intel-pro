@@ -54,7 +54,7 @@ ${newsContext || 'ไม่มีข่าวเฉพาะเจาะจง �
 }`;
 
       const aiResponse = await resilientFetch('gemini', async () => {
-        const models = ['gemini-3.5-flash', 'gemini-flash-lite-latest', 'gemini-3.7-flash'];
+        const models = ['gemini-3.7-flash', 'gemini-3.5-flash', 'gemini-2.5-pro', 'gemini-2.0-pro'];
         for (const model of models) {
           try {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
@@ -74,7 +74,15 @@ ${newsContext || 'ไม่มีข่าวเฉพาะเจาะจง �
               const data = await res.json();
               const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
               if (rawText) {
-                return JSON.parse(rawText.trim());
+                const match = rawText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+                const jsonStr = match ? match[1] : rawText.trim();
+                try {
+                  return JSON.parse(jsonStr);
+                } catch (parseErr) {
+                  const err = new Error('Gemini returned malformed JSON');
+                  (err as any).status = 422;
+                  throw err;
+                }
               }
             }
           } catch (mErr) {}
@@ -93,7 +101,7 @@ ${newsContext || 'ไม่มีข่าวเฉพาะเจาะจง �
           support: Array.isArray(aiResponse.support_levels) ? aiResponse.support_levels : [indicators.bollinger_lower, indicators.ema_50],
           resistance: Array.isArray(aiResponse.resistance_levels) ? aiResponse.resistance_levels : [indicators.bollinger_upper, indicators.ema_20],
         },
-        model_used: 'gemini-2.0-flash (Thai Deep Intelligence)',
+        model_used: 'gemini-3.7-flash (High Intelligence)',
         generated_at: new Date().toISOString(),
       };
     } catch (err) {
@@ -147,4 +155,83 @@ ${newsContext || 'ไม่มีข่าวเฉพาะเจาะจง �
     model_used: 'AI Macro Engine (Thai)',
     generated_at: new Date().toISOString(),
   };
+}
+
+/**
+ * Batch analyze news sentiment using Gemini AI
+ * Solves the issue where keyword heuristics fail on context (e.g. "NO rate cut")
+ */
+export async function enrichArticlesWithAISentiment(articles: NewsArticle[]): Promise<NewsArticle[]> {
+  if (!GEMINI_API_KEY || articles.length === 0) return articles;
+
+  // Process in batches of 15 to avoid overloading the model
+  const BATCH_SIZE = 15;
+  const enrichedArticles = [...articles];
+
+  for (let i = 0; i < enrichedArticles.length; i += BATCH_SIZE) {
+    const batch = enrichedArticles.slice(i, i + BATCH_SIZE);
+    
+    const headlinesList = batch.map((a, idx) => `[ID: ${idx}] Asset: ${a.ticker} | Headline: ${a.headline}`).join('\n');
+    
+    const prompt = `You are a professional quantitative financial analyst. 
+Analyze the following news headlines and determine the sentiment impact specifically on the listed Asset (e.g., if Asset is EURUSD, how does it affect EUR vs USD? If Asset is Gold, how does it affect Gold?). 
+Return a JSON array of objects with the exact structure below, matching the ID. 
+Sentiment Score must be a float between -1.0 (very bearish) and 1.0 (very bullish). 0 is neutral.
+
+Headlines to analyze:
+${headlinesList}
+
+Output JSON format only:
+[
+  { "id": 0, "score": 0.5 },
+  { "id": 1, "score": -0.8 }
+]`;
+
+    try {
+      const aiResponse = await resilientFetch('gemini', async () => {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key=${GEMINI_API_KEY}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
+          }),
+        });
+
+        if (!res.ok) throw new Error('Gemini API Error');
+        const data = await res.json();
+        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (rawText) {
+          const match = rawText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+          const jsonStr = match ? match[1] : rawText.trim();
+          try {
+            return JSON.parse(jsonStr);
+          } catch (parseErr) {
+            const err = new Error('Gemini returned malformed JSON for batch');
+            (err as any).status = 422;
+            throw err;
+          }
+        }
+        return null;
+      });
+
+      if (Array.isArray(aiResponse)) {
+        aiResponse.forEach((resItem) => {
+          if (typeof resItem.id === 'number' && typeof resItem.score === 'number') {
+            const article = batch[resItem.id];
+            if (article) {
+              const score = Math.max(-1.0, Math.min(1.0, resItem.score));
+              article.sentiment_score = score;
+              article.sentiment_label = score >= 0.15 ? 'Bullish' : score <= -0.15 ? 'Bearish' : 'Neutral';
+            }
+          }
+        });
+      }
+    } catch (err) {
+      console.warn(`[Gemini Sentiment] Batch ${i / BATCH_SIZE} failed, falling back to heuristic.`);
+    }
+  }
+
+  return enrichedArticles;
 }

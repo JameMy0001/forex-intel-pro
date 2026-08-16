@@ -1,5 +1,5 @@
 import { CandleData, TechnicalIndicators } from '../types';
-import { RSI, MACD, BollingerBands, EMA, ATR } from 'technicalindicators';
+import { RSI, MACD, BollingerBands, EMA, ATR, ADX } from 'technicalindicators';
 
 /**
  * Compute all technical indicators from raw OHLCV candle series
@@ -25,6 +25,10 @@ export function computeTechnicalIndicators(
       ema_50: 0,
       ema_200: 0,
       atr_14: 0,
+      adx_14: 0,
+      recent_high: 0,
+      recent_low: 0,
+      market_regime: 'RANGING',
       trend_bias: 'RANGING',
       computed_at: new Date().toISOString(),
     };
@@ -93,13 +97,36 @@ export function computeTechnicalIndicators(
     ? atrResults[atrResults.length - 1]
     : Math.abs(currentPrice * 0.012);
 
-  // 6. Trend Bias Detection
+  // 6. ADX (14) - Average Directional Index for Market Regime
+  const adxResults = ADX.calculate({
+    high: highs,
+    low: lows,
+    close: closes,
+    period: 14,
+  });
+  const latestADX = adxResults.length > 0
+    ? adxResults[adxResults.length - 1].adx ?? 0
+    : 0;
+
+  // 7. Trend Bias Detection
   let trendBias: 'BULLISH' | 'BEARISH' | 'RANGING' = 'RANGING';
   if (currentPrice > latestEMA50 && latestEMA20 > latestEMA50) {
     trendBias = 'BULLISH';
   } else if (currentPrice < latestEMA50 && latestEMA20 < latestEMA50) {
     trendBias = 'BEARISH';
   }
+
+  // 8. Market Regime Detection
+  let marketRegime: 'TRENDING' | 'RANGING' | 'VOLATILE' = 'RANGING';
+  if (latestATR > currentPrice * 0.02) { // Example threshold for high volatility
+    marketRegime = 'VOLATILE';
+  } else if (latestADX > 25) {
+    marketRegime = 'TRENDING';
+  }
+
+  // 9. Structural Support / Resistance (last 5 bars)
+  const recentHigh = Math.max(...highs.slice(-5));
+  const recentLow = Math.min(...lows.slice(-5));
 
   return {
     ticker,
@@ -115,6 +142,10 @@ export function computeTechnicalIndicators(
     ema_50: Number(latestEMA50.toFixed(4)),
     ema_200: Number(latestEMA200.toFixed(4)),
     atr_14: Number(latestATR.toFixed(4)),
+    adx_14: Number(latestADX.toFixed(4)),
+    recent_high: Number(recentHigh.toFixed(4)),
+    recent_low: Number(recentLow.toFixed(4)),
+    market_regime: marketRegime,
     trend_bias: trendBias,
     computed_at: new Date().toISOString(),
   };

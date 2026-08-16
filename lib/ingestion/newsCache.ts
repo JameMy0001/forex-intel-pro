@@ -20,12 +20,17 @@ export async function getCachedDailyNews(
       const db = getDbClient();
 
       // Check if we have recent news in DB within 12 hours
-      const res = await db.execute(`
+      const tickerPlaceholders = tickers.map(() => '?').join(',');
+      const res = await db.execute({
+        sql: `
         SELECT * FROM news_articles
         WHERE published_at >= datetime('now', '-12 hours')
+        AND ticker IN (${tickerPlaceholders})
         ORDER BY published_at DESC 
         LIMIT 30
-      `);
+        `,
+        args: tickers
+      });
 
       if (res.rows.length >= 3) {
         console.log(`[NewsCache] Cache HIT — serving ${res.rows.length} cached articles`);

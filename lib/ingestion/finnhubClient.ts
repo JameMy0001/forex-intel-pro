@@ -118,40 +118,7 @@ export async function fetchLiveQuote(ticker: string, assetType: string = 'stock'
     console.warn(`[Secondary Live Quote] Failed for ${ticker}: ${(secErr as Error).message}`);
   }
 
-  // Fallback defaults with accurate benchmark figures if network is restricted
-  const benchmarkPrices: Record<string, number> = {
-    EURUSD: 1.0845,
-    GBPUSD: 1.2930,
-    USDJPY: 154.20,
-    AUDUSD: 0.6540,
-    USDCHF: 0.8850,
-    USDCAD: 1.3820,
-    XAUUSD: 2745.50,
-    AAPL: 232.50,
-    NVDA: 138.25,
-    TSLA: 248.60,
-    MSFT: 428.10,
-    AMZN: 198.40,
-    GOOGL: 178.80,
-    SPY: 586.20,
-  };
-
-  const basePrice = benchmarkPrices[ticker] || 100.0;
-  return {
-    ticker,
-    price: basePrice,
-    open_price: basePrice * 0.998,
-    high_price: basePrice * 1.005,
-    low_price: basePrice * 0.995,
-    previous_close: basePrice * 0.997,
-    change_amount: basePrice * 0.003,
-    change_percent: 0.30,
-    bid: basePrice * 0.9998,
-    ask: basePrice * 1.0002,
-    volume: 1500000,
-    source: 'benchmark',
-    captured_at: nowStr,
-  };
+  throw new Error(`Failed to fetch live quote for ${ticker} from any available source.`);
 }
 
 /**
@@ -278,41 +245,5 @@ export async function fetchCandleHistory(
     console.warn(`[Yahoo Candles] Failed for ${ticker}: ${(yfErr as Error).message}`);
   }
 
-  // Generate realistic contiguous historical candles from current base quote
-  const baseQuote = await fetchLiveQuote(ticker, assetType);
-  const currentPrice = baseQuote.price;
-  const generatedCandles: CandleData[] = [];
-  const now = Date.now();
-  let walkingPrice = currentPrice * 0.94; // 60 days ago
-
-  for (let i = count; i >= 0; i--) {
-    const timestamp = now - (i * 24 * 60 * 60 * 1000);
-    const dayRandom = (Math.random() - 0.48) * 0.02; // slight upward drift
-    const open = walkingPrice;
-    walkingPrice = walkingPrice * (1 + dayRandom);
-    const close = walkingPrice;
-    const high = Math.max(open, close) * (1 + Math.random() * 0.008);
-    const low = Math.min(open, close) * (1 - Math.random() * 0.008);
-    const date = new Date(timestamp);
-
-    generatedCandles.push({
-      timestamp,
-      open: Number(open.toFixed(4)),
-      high: Number(high.toFixed(4)),
-      low: Number(low.toFixed(4)),
-      close: Number(close.toFixed(4)),
-      volume: Math.floor(500000 + Math.random() * 2000000),
-      timeStr: date.toISOString().split('T')[0],
-    });
-  }
-
-  // Ensure last candle matches live current price
-  if (generatedCandles.length > 0) {
-    const last = generatedCandles[generatedCandles.length - 1];
-    last.close = currentPrice;
-    last.high = Math.max(last.high, currentPrice);
-    last.low = Math.min(last.low, currentPrice);
-  }
-
-  return generatedCandles;
+  throw new Error(`Failed to fetch historical candles for ${ticker} from any available source.`);
 }

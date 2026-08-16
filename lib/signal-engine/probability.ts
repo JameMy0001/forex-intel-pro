@@ -15,22 +15,26 @@ function sigmoid(z: number): number {
 }
 
 /**
- * Normalize RSI to [-1.0, 1.0] signal
- * RSI < 30 -> oversold (bullish reversal signal: +0.6 to +1.0)
- * RSI > 70 -> overbought (bearish reversal signal: -0.6 to -1.0)
- * 45-55 -> neutral
+ * Normalize RSI to [-1.0, 1.0] signal with Trend-Awareness
+ * In Uptrend: RSI 60-80 is good momentum (BUY), RSI < 40 is weak
+ * In Downtrend: RSI 20-40 is good momentum (SELL), RSI > 60 is weak
+ * In Ranging: RSI > 70 is SELL, RSI < 30 is BUY
  */
-function normalizeRSI(rsi: number): number {
-  if (rsi <= 30) {
-    return 0.6 + ((30 - rsi) / 30) * 0.4; // +0.6 to +1.0
+function normalizeRSI(rsi: number, trendBias: 'BULLISH' | 'BEARISH' | 'RANGING'): number {
+  if (trendBias === 'BULLISH') {
+    if (rsi >= 55 && rsi <= 75) return 0.6; // momentum sweet spot
+    if (rsi < 40) return -0.8;              // trend weakening
+    return 0.2;
+  } else if (trendBias === 'BEARISH') {
+    if (rsi <= 45 && rsi >= 25) return -0.6;
+    if (rsi > 60) return 0.8;
+    return -0.2;
+  } else {
+    // Ranging: reversal logic
+    if (rsi <= 30) return 0.7;
+    if (rsi >= 70) return -0.7;
+    return (rsi - 50) / 100;
   }
-  if (rsi >= 70) {
-    return -0.6 - ((rsi - 70) / 30) * 0.4; // -0.6 to -1.0
-  }
-  if (rsi > 50) {
-    return ((rsi - 50) / 20) * 0.5; // +0.0 to +0.5
-  }
-  return -((50 - rsi) / 20) * 0.5; // -0.5 to -0.0
 }
 
 /**
@@ -92,7 +96,8 @@ export function calculateProbabilityScore(
   changePercent: number,
   assetType: AssetType,
   indicators: TechnicalIndicators,
-  newsArticles: NewsArticle[]
+  newsArticles: NewsArticle[],
+  indicators4H?: TechnicalIndicators
 ): SignalOutput {
   // 1. Sentiment Component Calculation (Average of recent articles)
   const tickerArticles = newsArticles.filter(
@@ -108,38 +113,62 @@ export function calculateProbabilityScore(
   const sentimentComponent = Math.max(-1.0, Math.min(1.0, Number(sentimentScore.toFixed(3))));
 
   // 2. Technical Momentum Component
-  const rsiSignal = normalizeRSI(indicators.rsi_14);
+  const rsiSignal = normalizeRSI(indicators.rsi_14, indicators.trend_bias);
   const macdSignal = normalizeMACD(indicators);
   const technicalComponent = Number((rsiSignal * 0.5 + macdSignal * 0.5).toFixed(3));
 
   // 3. Trend Component
-  const trendComponent = Number(normalizeTrend(currentPrice, indicators).toFixed(3));
+  let trendComponent = Number(normalizeTrend(currentPrice, indicators).toFixed(3));
 
-  // 4. Weight Allocation by Asset Type
+  // Multi-Timeframe Analysis (MTFA): Align 1D with 4H trend
+  let isMtfaAligned = false;
+  let isMtfaConflicting = false;
+  
+  if (indicators4H) {
+    const trend4H = normalizeTrend(currentPrice, indicators4H);
+    if ((trendComponent > 0 && trend4H > 0) || (trendComponent < 0 && trend4H < 0)) {
+      trendComponent += trend4H * 0.35; // Boost if aligned
+      isMtfaAligned = true;
+    } else {
+      trendComponent *= 0.5; // Penalize if conflicting
+      isMtfaConflicting = true;
+    }
+    trendComponent = Math.max(-1.0, Math.min(1.0, Number(trendComponent.toFixed(3))));
+  }
+
+  // 4. Weight Allocation by Asset Type & Market Regime
   let wSentiment = 0.40;
   let wTech = 0.30;
   let wTrend = 0.30;
 
   if (assetType === 'stock') {
-    // Stocks: News & earnings drive price more than technicals
     wSentiment = 0.45;
     wTech = 0.35;
     wTrend = 0.20;
   } else if (assetType === 'forex') {
-    // Forex: Macro policy & trend are key drivers
     wSentiment = 0.40;
     wTech = 0.30;
     wTrend = 0.30;
   } else if (assetType === 'commodity') {
-    // Gold/Commodities: Fear index, DXY correlation — trend & tech dominant
     wSentiment = 0.30;
     wTech = 0.35;
     wTrend = 0.35;
   } else if (assetType === 'index') {
-    // Indices (SPY): Broad sentiment and trend-following
     wSentiment = 0.35;
     wTech = 0.30;
     wTrend = 0.35;
+  }
+
+  // Adjust weights based on ADX (Market Regime)
+  if (indicators.market_regime === 'TRENDING') {
+    // In strong trend, reduce sentiment impact, rely on trend/tech
+    wSentiment -= 0.10;
+    wTrend += 0.10;
+  } else if (indicators.market_regime === 'RANGING') {
+    // In ranging, trend is useless, rely more on sentiment & tech (mean reversion)
+    wTrend -= 0.15;
+    wTech += 0.10;
+    wSentiment += 0.05;
   }
 
   // Raw combined directional score (-1.0 to +1.0)
@@ -187,15 +216,17 @@ export function calculateProbabilityScore(
   const decimals = assetType === 'forex' && !ticker.includes('JPY') ? 4 : 2;
 
   if (isBullish) {
-    stopLoss = Number((currentPrice - 1.5 * atr).toFixed(decimals));
+    // Structural Stop Loss: below recent low, with ATR buffer
+    stopLoss = Number(Math.min(indicators.recent_low - 0.2 * atr, currentPrice - 1.5 * atr).toFixed(decimals));
     tp1 = Number((currentPrice + 2.0 * atr).toFixed(decimals));
     tp2 = Number((currentPrice + 3.5 * atr).toFixed(decimals));
-    rr = 2.0;
+    rr = Number(((tp1 - currentPrice) / (currentPrice - stopLoss)).toFixed(2));
   } else if (isBearish) {
-    stopLoss = Number((currentPrice + 1.5 * atr).toFixed(decimals));
+    // Structural Stop Loss: above recent high, with ATR buffer
+    stopLoss = Number(Math.max(indicators.recent_high + 0.2 * atr, currentPrice + 1.5 * atr).toFixed(decimals));
     tp1 = Number((currentPrice - 2.0 * atr).toFixed(decimals));
     tp2 = Number((currentPrice - 3.5 * atr).toFixed(decimals));
-    rr = 2.0;
+    rr = Number(((currentPrice - tp1) / (stopLoss - currentPrice)).toFixed(2));
   }
 
   // Directional Win Rate (e.g. 72% for STRONG_SELL instead of 28%)
@@ -205,14 +236,31 @@ export function calculateProbabilityScore(
     ? Number((probability * 100).toFixed(1))
     : 50.0;
 
+  // Expected Value (EV)
+  // EV = (Win Rate * Avg Win) - (Loss Rate * Avg Loss)
+  // Assuming 1 unit of risk (Loss = 1) and RR for Win
+  const winProb = winRate / 100;
+  const expectedValue = Number((winProb * rr - (1 - winProb) * 1).toFixed(2));
+
+  // Position Sizing (Fixed 1% Risk)
+  const stopLossDistancePercent = Math.abs(currentPrice - stopLoss) / currentPrice;
+  let positionSizePercent = stopLossDistancePercent > 0 ? Number((0.01 / stopLossDistancePercent).toFixed(4)) : 0;
+  // Cap position size to max 15% to prevent infinite leverage display on tight SL
+  if (positionSizePercent > 0.15) {
+    positionSizePercent = 0.15;
+  }
+
   // Explanation Narrative
   const thaiAction = isBullish ? 'ขาขึ้น (BUY)' : isBearish ? 'ขาลง (SELL)' : 'ไซด์เวย์ (NEUTRAL)';
-  const explanation = `${direction.replace('_', ' ')} (${thaiAction}): วินเรท ${winRate}% Conviction. ข่าว Sentiment (${(sentimentComponent >= 0 ? '+' : '') + (sentimentComponent * 100).toFixed(0)}%), RSI (${indicators.rsi_14.toFixed(1)}), MACD (${indicators.macd_histogram >= 0 ? 'Bullish' : 'Bearish'}), แนวโน้ม Trend (${indicators.trend_bias}).`;
+  const mtfaText = isMtfaAligned ? ' (MTFA Aligned)' : isMtfaConflicting ? ' (MTFA Conflicting)' : '';
+  const explanation = `${direction.replace('_', ' ')} (${thaiAction}): วินเรท ${winRate}% (EV: ${expectedValue > 0 ? '+' : ''}${expectedValue}). ข่าว (${(sentimentComponent >= 0 ? '+' : '') + (sentimentComponent * 100).toFixed(0)}%), ตลาด ${indicators.market_regime}${mtfaText}, RSI (${indicators.rsi_14.toFixed(1)}). SL ใต้โครงสร้างล่าสุด.`;
 
   return {
     ticker,
     probability_score: probability,
     win_rate_percent: winRate,
+    expected_value: expectedValue,
+    position_size_percent: positionSizePercent * 100, // as percentage
     confidence_level: confidence,
     direction,
     sentiment_component: sentimentComponent,
@@ -228,4 +276,44 @@ export function calculateProbabilityScore(
     price: currentPrice,
     change_percent: changePercent,
   };
+}
+
+/**
+ * Recalculate signal attributes (direction, confidence, win_rate, ev) after a probability penalty
+ */
+export function applyProbabilityPenalty(signal: SignalOutput, multiplier: number, penaltyReason: string): SignalOutput {
+  const newProb = Number((signal.probability_score * multiplier).toFixed(3));
+  signal.probability_score = newProb;
+  
+  if (newProb >= 0.72) {
+    signal.direction = 'STRONG_BUY';
+    signal.confidence_level = 'VERY_HIGH';
+  } else if (newProb >= 0.58) {
+    signal.direction = 'BUY';
+    signal.confidence_level = 'HIGH';
+  } else if (newProb <= 0.28) {
+    signal.direction = 'STRONG_SELL';
+    signal.confidence_level = 'VERY_HIGH';
+  } else if (newProb <= 0.42) {
+    signal.direction = 'SELL';
+    signal.confidence_level = 'HIGH';
+  } else {
+    signal.direction = 'NEUTRAL';
+    signal.confidence_level = 'MODERATE';
+  }
+
+  const isBullish = signal.direction === 'BUY' || signal.direction === 'STRONG_BUY';
+  const isBearish = signal.direction === 'SELL' || signal.direction === 'STRONG_SELL';
+
+  signal.win_rate_percent = isBearish
+    ? Number(((1 - newProb) * 100).toFixed(1))
+    : isBullish
+    ? Number((newProb * 100).toFixed(1))
+    : 50.0;
+
+  const winProb = signal.win_rate_percent / 100;
+  signal.expected_value = Number((winProb * (signal.risk_reward_ratio || 2.0) - (1 - winProb) * 1).toFixed(2));
+  signal.explanation += ` ${penaltyReason}`;
+
+  return signal;
 }

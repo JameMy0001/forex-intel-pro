@@ -10,6 +10,14 @@ const ALLOWED_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '6270422059';
 
 export async function POST(request: Request) {
   try {
+    const secretToken = request.headers.get('x-telegram-bot-api-secret-token');
+    const expectedToken = process.env.TELEGRAM_WEBHOOK_SECRET;
+
+    if (expectedToken && secretToken !== expectedToken) {
+      console.warn('[Telegram Webhook Error]: Unauthorized webhook access attempt');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const update = await request.json();
 
     // Handle normal text messages

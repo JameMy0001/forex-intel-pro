@@ -28,11 +28,16 @@ export const MarketTicker: React.FC = () => {
   const [items, setItems] = useState<TickerItem[]>(FALLBACK_ITEMS);
 
   useEffect(() => {
+    const controller = new AbortController();
+
     async function loadLivePrices() {
       try {
-        const res = await fetch('/api/signals', { cache: 'no-store' });
+        const res = await fetch('/api/signals', { cache: 'no-store', signal: controller.signal });
         if (!res.ok) return;
         const json = await res.json();
+        
+        if (controller.signal.aborted) return;
+
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {
           const liveItems: TickerItem[] = json.data
             .filter((d: any) => d?.quote?.price && d?.symbol?.ticker)
@@ -47,13 +52,19 @@ export const MarketTicker: React.FC = () => {
             setItems(liveItems);
           }
         }
-      } catch {
-        // Keep fallback items on error
+      } catch (err: any) {
+        // Keep fallback items on error, unless it's an abort
+        if (err.name !== 'AbortError') {
+          // silently ignore
+        }
       }
     }
     loadLivePrices();
     const interval = setInterval(loadLivePrices, 60000); // refresh every 60s
-    return () => clearInterval(interval);
+    return () => {
+      controller.abort();
+      clearInterval(interval);
+    };
   }, []);
 
   return (

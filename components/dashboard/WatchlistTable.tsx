@@ -106,14 +106,25 @@ export const WatchlistTable: React.FC<WatchlistTableProps> = ({
               <th className="py-3 px-4 font-semibold text-right">ราคาปัจจุบัน</th>
               <th className="py-3 px-4 font-semibold text-right">เปลี่ยนแปลง 24ชม.</th>
               <th className="py-3 px-4 font-semibold text-center">RSI (14)</th>
-              <th className="py-3 px-4 font-semibold text-center">แนวโน้ม (Trend)</th>
+              <th className="py-3 px-4 font-semibold text-center">สภาวะ (Regime)</th>
+              <th className="py-3 px-4 font-semibold text-center">Expected Value</th>
               <th className="py-3 px-4 font-semibold text-center">ความน่าจะเป็นชนะ</th>
               <th className="py-3 px-4 font-semibold text-center">ทิศทางสัญญาณ</th>
               <th className="py-3 px-4 font-semibold text-right">ส่งเตือน / กราฟ</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/[0.04]">
-            {filteredData.map((row) => {
+            {filteredData.length === 0 ? (
+              <tr>
+                <td colSpan={9} className="py-16 text-center">
+                  <div className="flex flex-col items-center justify-center text-slate-500">
+                    <Search className="w-8 h-8 mb-3 opacity-20" />
+                    <p className="text-xs">ไม่พบคู่เงินที่ตรงกับคำค้นหาหรือตัวกรอง</p>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              filteredData.map((row) => {
               const isUp = (row.quote.change_percent || 0) >= 0;
               const isBull = row.signal.direction.includes('BUY');
               const isBear = row.signal.direction.includes('SELL');
@@ -203,18 +214,28 @@ export const WatchlistTable: React.FC<WatchlistTableProps> = ({
                     </span>
                   </td>
 
-                  {/* Trend Bias */}
+                  {/* Market Regime & Trend Bias */}
                   <td className="py-3 px-4 text-center">
-                    <span
-                      className={`text-[10px] font-sans font-medium px-2 py-0.5 rounded ${
-                        row.indicators.trend_bias === 'BULLISH'
-                          ? 'text-emerald-400 bg-emerald-950/40'
-                          : row.indicators.trend_bias === 'BEARISH'
-                          ? 'text-rose-400 bg-rose-950/40'
-                          : 'text-slate-400 bg-slate-900/60'
-                      }`}
-                    >
-                      {thaiTrend}
+                    <div className="flex flex-col items-center gap-1">
+                      <span
+                        className={`text-[10px] font-sans font-medium px-2 py-0.5 rounded ${
+                          row.indicators.trend_bias === 'BULLISH'
+                            ? 'text-emerald-400 bg-emerald-950/40'
+                            : row.indicators.trend_bias === 'BEARISH'
+                            ? 'text-rose-400 bg-rose-950/40'
+                            : 'text-slate-400 bg-slate-900/60'
+                        }`}
+                      >
+                        {thaiTrend}
+                      </span>
+                      <span className="text-[9px] font-mono text-slate-500 uppercase">{row.indicators.market_regime || 'RANGING'}</span>
+                    </div>
+                  </td>
+
+                  {/* Expected Value */}
+                  <td className="py-3 px-4 text-center">
+                    <span className={`font-mono text-xs font-bold ${row.signal.expected_value && row.signal.expected_value > 0 ? 'text-emerald-400' : 'text-slate-400'}`}>
+                      {row.signal.expected_value ? `${row.signal.expected_value > 0 ? '+' : ''}${row.signal.expected_value.toFixed(2)}` : '—'}
                     </span>
                   </td>
 
@@ -278,7 +299,8 @@ export const WatchlistTable: React.FC<WatchlistTableProps> = ({
                   </td>
                 </tr>
               );
-            })}
+            })
+            )}
           </tbody>
         </table>
       </div>

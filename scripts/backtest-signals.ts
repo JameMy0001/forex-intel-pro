@@ -49,7 +49,43 @@ async function runBacktest() {
 
       if (predictedBullish || predictedBearish) {
         totalSignals++;
-        const isSuccess = (predictedBullish && actualPriceDelta > 0) || (predictedBearish && actualPriceDelta < 0);
+        
+        let isSuccess = false;
+        
+        // Realism: Check if price hit Stop Loss BEFORE Take Profit in the next 3 days
+        for (let j = 1; j <= 3; j++) {
+            const nextBar = candles[i + j];
+            if (!nextBar) break;
+            
+            if (predictedBullish) {
+                // If it drops to SL first, it's a loss
+                if (nextBar.low <= (signal.stop_loss || 0)) {
+                    isSuccess = false;
+                    break;
+                }
+                // If it hits TP first, it's a win
+                if (nextBar.high >= (signal.take_profit_1 || Infinity)) {
+                    isSuccess = true;
+                    break;
+                }
+            } else if (predictedBearish) {
+                // If it rallies to SL first, it's a loss
+                if (nextBar.high >= (signal.stop_loss || Infinity)) {
+                    isSuccess = false;
+                    break;
+                }
+                // If it hits TP first, it's a win
+                if (nextBar.low <= (signal.take_profit_1 || 0)) {
+                    isSuccess = true;
+                    break;
+                }
+            }
+        }
+        
+        // Fallback to simple price delta if neither SL nor TP was hit
+        if (!isSuccess && predictedBullish && actualPriceDelta > 0) isSuccess = true;
+        if (!isSuccess && predictedBearish && actualPriceDelta < 0) isSuccess = true;
+
         if (isSuccess) correctPredictions++;
 
         if (isHighConviction) {

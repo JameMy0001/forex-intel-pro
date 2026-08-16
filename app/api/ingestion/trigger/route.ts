@@ -17,6 +17,21 @@ export const maxDuration = 60; // Allow full execution time on Vercel Serverless
 
 export async function GET(request: Request) {
   try {
+    const authHeader = request.headers.get('authorization');
+    const cronSecret = process.env.CRON_SECRET;
+    
+    // Allow if CRON_SECRET matches (for Vercel Cron)
+    const isCronAuthorized = cronSecret && authHeader === `Bearer ${cronSecret}`;
+    // Or if accessing via browser/tool during dev, allow via query param for testing (only if explicitly set in env)
+    const url = new URL(request.url);
+    const token = url.searchParams.get('token');
+    const isTokenAuthorized = cronSecret && token === cronSecret;
+
+    if (!isCronAuthorized && !isTokenAuthorized && process.env.NODE_ENV === 'production') {
+      console.warn('[Ingestion Trigger] Unauthorized access attempt');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const settings = await getSystemSettings();
 
     let targetSymbols = DEFAULT_SYMBOLS;

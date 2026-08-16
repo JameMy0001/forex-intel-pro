@@ -85,6 +85,10 @@ export interface TechnicalIndicators {
   ema_50: number;
   ema_200: number;
   atr_14: number;
+  adx_14: number;
+  recent_high: number;
+  recent_low: number;
+  market_regime: 'TRENDING' | 'RANGING' | 'VOLATILE';
   trend_bias: 'BULLISH' | 'BEARISH' | 'RANGING';
   computed_at: string;
 }
@@ -109,6 +113,8 @@ export interface SignalOutput {
   price?: number;
   change_percent?: number;
   win_rate_percent?: number;
+  expected_value?: number;
+  position_size_percent?: number;
 }
 
 export interface AIAnalysisOutput {

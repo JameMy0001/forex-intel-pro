@@ -185,6 +185,8 @@ export async function ensureTables(): Promise<void> {
       await db.execute(`CREATE INDEX IF NOT EXISTS idx_price_snapshots_ticker_captured ON price_snapshots (ticker, captured_at DESC);`);
       await db.execute(`CREATE INDEX IF NOT EXISTS idx_news_articles_published ON news_articles (published_at DESC);`);
       await db.execute(`CREATE INDEX IF NOT EXISTS idx_alerts_log_ticker ON alerts_log (ticker, sent_at DESC);`);
+      await db.execute(`CREATE INDEX IF NOT EXISTS idx_indicators_ticker_computed ON technical_indicators (ticker, computed_at DESC);`);
+      await db.execute(`CREATE INDEX IF NOT EXISTS idx_ai_analyses_ticker_generated ON ai_analyses (ticker, generated_at DESC);`);
 
       // Seed default settings
       try {

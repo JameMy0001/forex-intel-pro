@@ -124,9 +124,15 @@ export const TopConvictionCard: React.FC<TopConvictionCardProps> = ({
       <div className="bg-[#090d18] p-3 rounded-lg border border-white/[0.07] mb-4 space-y-2 text-xs">
         <div className="flex items-center justify-between text-[10px] text-slate-400 font-sans border-b border-white/[0.05] pb-1.5">
           <span className="flex items-center gap-1 text-blue-400 font-semibold">
-            <Smartphone className="w-3 h-3" /> แตะตัวเลขเพื่อก็อปปี้ใส่ MT5:
+            <Smartphone className="w-3 h-3" /> ก็อปปี้ใส่ MT5:
           </span>
-          <span className="text-slate-400 font-mono">R:R 1:{signal.risk_reward_ratio}</span>
+          <div className="flex items-center gap-2 font-mono">
+            <span>R:R 1:{signal.risk_reward_ratio}</span>
+            <span className={signal.expected_value && signal.expected_value > 0 ? 'text-emerald-400' : 'text-slate-400'}>
+              EV {signal.expected_value ? `${signal.expected_value > 0 ? '+' : ''}${signal.expected_value}` : '—'}
+            </span>
+            <span className="text-blue-300">Lot {signal.position_size_percent?.toFixed(1) || '1.0'}%</span>
+          </div>
         </div>
 
         {/* Entry */}

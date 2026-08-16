@@ -25,7 +25,10 @@ export async function POST(request: Request) {
     const [quote, candles, newsArticles] = await Promise.all([
       fetchLiveQuote(ticker, symbolInfo.asset_type),
       fetchCandleHistory(ticker, symbolInfo.asset_type, 'D', 60),
-      fetchMarketauxNews([ticker]),
+      fetchMarketauxNews([ticker]).catch((err) => {
+        console.warn(`[AI Analyze API] Failed to fetch news for ${ticker}:`, err.message);
+        return [];
+      }),
     ]);
 
     const indicators = computeTechnicalIndicators(candles, ticker, '1D');

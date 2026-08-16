@@ -1,6 +1,7 @@
 import { NewsArticle, SentimentLabel } from '../types';
 import { calculateTextSentiment, getSentimentLabel } from './marketauxClient';
 import { saveNewsArticles } from '../db/localDb';
+import { enrichArticlesWithAISentiment } from '../signal-engine/aiAnalyst';
 
 /**
  * Google News RSS Feed — Zero rate limit, no API key needed.
@@ -220,11 +221,14 @@ export async function fetchAggregatedNews(tickers: string[]): Promise<NewsArticl
   // Sort by recency
   allArticles.sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime());
 
+  // Enrich with Gemini AI Sentiment (fixes the keyword heuristic flaws)
+  const enrichedArticles = await enrichArticlesWithAISentiment(allArticles);
+
   // Persist to DB for caching
-  if (allArticles.length > 0) {
-    await saveNewsArticles(allArticles).catch(() => {});
+  if (enrichedArticles.length > 0) {
+    await saveNewsArticles(enrichedArticles).catch(() => {});
   }
 
-  console.log(`[NewsAggregator] Fetched ${allArticles.length} deduplicated articles from Google News RSS + Finnhub`);
-  return allArticles;
+  console.log(`[NewsAggregator] Fetched ${enrichedArticles.length} deduplicated articles from Google News RSS + Finnhub, enriched with AI sentiment.`);
+  return enrichedArticles;
 }
