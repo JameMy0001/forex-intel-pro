@@ -90,6 +90,8 @@ export interface TechnicalIndicators {
   recent_low: number;
   market_regime: 'TRENDING' | 'RANGING' | 'VOLATILE';
   trend_bias: 'BULLISH' | 'BEARISH' | 'RANGING';
+  smc_fvg_type?: 'BULLISH' | 'BEARISH' | 'NONE'; // Fair Value Gap
+  smc_liquidity_sweep?: 'BULLISH' | 'BEARISH' | 'NONE'; // Liquidity Sweep
   computed_at: string;
 }
 

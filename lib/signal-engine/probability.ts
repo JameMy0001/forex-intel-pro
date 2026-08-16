@@ -7,6 +7,8 @@ import {
   AssetType,
 } from '../types';
 import { getMarketStatus } from '../market/marketSchedule';
+import { MacroYieldResult } from '../market/macroYield';
+import { CoTResult } from '../market/cotTracker';
 
 /**
  * Standard Sigmoid Function
@@ -98,7 +100,9 @@ export function calculateProbabilityScore(
   assetType: AssetType,
   indicators: TechnicalIndicators,
   newsArticles: NewsArticle[],
-  indicators4H?: TechnicalIndicators
+  indicators4H?: TechnicalIndicators,
+  macroYield?: MacroYieldResult,
+  cotState?: CoTResult
 ): SignalOutput {
   // 1. Sentiment Component Calculation (Average of recent articles)
   const tickerArticles = newsArticles.filter(
@@ -266,6 +270,34 @@ export function calculateProbabilityScore(
     finalProbability = Number(finalProbability.toFixed(3));
   }
 
+  // --- SMC Shield (God-Tier) ---
+  if (indicators.smc_liquidity_sweep === 'BULLISH') {
+    if (finalProbability > 0.5) finalProbability = Math.min(0.99, finalProbability + 0.05);
+    riskPenaltyText += ` [🔥 SMC: Bullish Liquidity Sweep (กวาด Stop Loss ขาลงแล้วดึงกลับ)]`;
+  } else if (indicators.smc_liquidity_sweep === 'BEARISH') {
+    if (finalProbability < 0.5) finalProbability = Math.max(0.01, finalProbability - 0.05);
+    riskPenaltyText += ` [🔥 SMC: Bearish Liquidity Sweep (กวาด Stop Loss ขาขึ้นแล้วทุบ)]`;
+  }
+
+  if (indicators.smc_fvg_type === 'BULLISH' && finalProbability > 0.5) {
+    finalProbability = Math.min(0.99, finalProbability + 0.03);
+    riskPenaltyText += ` [🟢 SMC: มี Fair Value Gap รองรับราคา]`;
+  } else if (indicators.smc_fvg_type === 'BEARISH' && finalProbability < 0.5) {
+    finalProbability = Math.max(0.01, finalProbability - 0.03);
+    riskPenaltyText += ` [🔴 SMC: มี Fair Value Gap กดดันราคา]`;
+  }
+
+  // --- Macro Yield Arbitrage (God-Tier) ---
+  if (macroYield && macroYield.arbitrage_signal !== 'NEUTRAL') {
+    if (macroYield.arbitrage_signal === 'BUY_OPPORTUNITY') {
+      finalProbability = Math.min(0.99, finalProbability + 0.08); // Big Boost
+      riskPenaltyText += ` [📈 Macro Arb: ยีลด์พันธบัตรหนุนทิศทาง Buy]`;
+    } else {
+      finalProbability = Math.max(0.01, finalProbability - 0.08); // Big Boost for Sell
+      riskPenaltyText += ` [📉 Macro Arb: ยีลด์พันธบัตรกดดันให้ Sell]`;
+    }
+  }
+
   // Recalculate Final Direction (Sniper Mode Thresholds)
   if (finalProbability >= 0.80) {
     direction = 'STRONG_BUY';
@@ -282,6 +314,15 @@ export function calculateProbabilityScore(
   } else {
     direction = 'NEUTRAL';
     confidence = 'MODERATE';
+  }
+
+  // --- Institutional CoT Veto (God-Tier) ---
+  if (cotState && cotState.veto_signal) {
+    // If CoT Veto is triggered, neutralize the signal completely
+    direction = 'NEUTRAL';
+    confidence = 'LOW';
+    finalProbability = 0.5;
+    riskPenaltyText += ` ${cotState.veto_reason}`;
   }
 
   // Directional Win Rate

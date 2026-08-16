@@ -17,7 +17,7 @@ export const DEFAULT_SYMBOLS: SymbolInfo[] = [
     display_name: 'GBP / USD (British Pound / US Dollar)',
     asset_type: 'forex',
     category: 'Major FX',
-    is_active: true,
+    is_active: false, // Too volatile for $10
     alert_threshold: 0.70,
   },
   {
@@ -62,7 +62,7 @@ export const DEFAULT_SYMBOLS: SymbolInfo[] = [
     display_name: 'GBP / JPY (British Pound / Japanese Yen)',
     asset_type: 'forex',
     category: 'Cross FX',
-    is_active: true,
+    is_active: false, // Too volatile for $10
     alert_threshold: 0.72,
   },
   {
@@ -71,7 +71,7 @@ export const DEFAULT_SYMBOLS: SymbolInfo[] = [
     display_name: 'EUR / JPY (Euro / Japanese Yen)',
     asset_type: 'forex',
     category: 'Cross FX',
-    is_active: true,
+    is_active: false, // High spread risk for $10
     alert_threshold: 0.70,
   },
   {
@@ -80,7 +80,7 @@ export const DEFAULT_SYMBOLS: SymbolInfo[] = [
     display_name: 'XAU / USD (Gold / US Dollar)',
     asset_type: 'commodity',
     category: 'Precious Metal',
-    is_active: true,
+    is_active: false, // EXTREME DANGER FOR $10 ACCOUNT
     alert_threshold: 0.72,
   },
 
@@ -91,7 +91,7 @@ export const DEFAULT_SYMBOLS: SymbolInfo[] = [
     display_name: 'Apple Inc.',
     asset_type: 'stock',
     category: 'Tech MegaCap',
-    is_active: true,
+    is_active: false,
     alert_threshold: 0.70,
   },
   {
@@ -100,7 +100,7 @@ export const DEFAULT_SYMBOLS: SymbolInfo[] = [
     display_name: 'NVIDIA Corporation',
     asset_type: 'stock',
     category: 'Semiconductors / AI',
-    is_active: true,
+    is_active: false,
     alert_threshold: 0.72,
   },
   {
@@ -109,7 +109,7 @@ export const DEFAULT_SYMBOLS: SymbolInfo[] = [
     display_name: 'Tesla, Inc.',
     asset_type: 'stock',
     category: 'EV & Auto Tech',
-    is_active: true,
+    is_active: false,
     alert_threshold: 0.70,
   },
   {
@@ -118,7 +118,7 @@ export const DEFAULT_SYMBOLS: SymbolInfo[] = [
     display_name: 'Microsoft Corporation',
     asset_type: 'stock',
     category: 'Cloud & AI Software',
-    is_active: true,
+    is_active: false,
     alert_threshold: 0.70,
   },
   {
@@ -127,7 +127,7 @@ export const DEFAULT_SYMBOLS: SymbolInfo[] = [
     display_name: 'Amazon.com Inc.',
     asset_type: 'stock',
     category: 'E-Commerce & Cloud',
-    is_active: true,
+    is_active: false,
     alert_threshold: 0.70,
   },
   {
@@ -136,7 +136,7 @@ export const DEFAULT_SYMBOLS: SymbolInfo[] = [
     display_name: 'Alphabet Inc.',
     asset_type: 'stock',
     category: 'Internet & Search',
-    is_active: true,
+    is_active: false,
     alert_threshold: 0.70,
   },
   {
@@ -145,7 +145,7 @@ export const DEFAULT_SYMBOLS: SymbolInfo[] = [
     display_name: 'SPDR S&P 500 ETF Trust',
     asset_type: 'index',
     category: 'Broad Market Index',
-    is_active: true,
+    is_active: false,
     alert_threshold: 0.68,
   },
 ];

@@ -128,6 +128,40 @@ export function computeTechnicalIndicators(
   const recentHigh = Math.max(...highs.slice(-5));
   const recentLow = Math.min(...lows.slice(-5));
 
+  // 10. Smart Money Concepts (SMC) - Fair Value Gaps (FVG)
+  let smcFvgType: 'BULLISH' | 'BEARISH' | 'NONE' = 'NONE';
+  if (candles.length >= 3) {
+    const c1 = candles[candles.length - 3];
+    const c2 = candles[candles.length - 2];
+    const c3 = candles[candles.length - 1];
+    
+    // Bullish FVG: Low of C3 is higher than High of C1
+    if (c3.low > c1.high && c2.close > c2.open) {
+      smcFvgType = 'BULLISH';
+    }
+    // Bearish FVG: High of C3 is lower than Low of C1
+    else if (c3.high < c1.low && c2.close < c2.open) {
+      smcFvgType = 'BEARISH';
+    }
+  }
+
+  // 11. SMC - Liquidity Sweeps
+  let smcLiquiditySweep: 'BULLISH' | 'BEARISH' | 'NONE' = 'NONE';
+  if (candles.length >= 10) {
+    const current = candles[candles.length - 1];
+    const previousLow = Math.min(...lows.slice(-10, -1));
+    const previousHigh = Math.max(...highs.slice(-10, -1));
+    
+    // Bullish Sweep: Price sweeps below previous 10-bar low, but closes strongly above it
+    if (current.low < previousLow && current.close > previousLow && (current.close - current.low) > (current.high - current.close)) {
+      smcLiquiditySweep = 'BULLISH';
+    }
+    // Bearish Sweep: Price sweeps above previous 10-bar high, but closes strongly below it
+    else if (current.high > previousHigh && current.close < previousHigh && (current.high - current.close) > (current.close - current.low)) {
+      smcLiquiditySweep = 'BEARISH';
+    }
+  }
+
   return {
     ticker,
     timeframe,
@@ -147,6 +181,8 @@ export function computeTechnicalIndicators(
     recent_low: Number(recentLow.toFixed(4)),
     market_regime: marketRegime,
     trend_bias: trendBias,
+    smc_fvg_type: smcFvgType,
+    smc_liquidity_sweep: smcLiquiditySweep,
     computed_at: new Date().toISOString(),
   };
 }

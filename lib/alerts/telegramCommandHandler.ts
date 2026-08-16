@@ -2,6 +2,8 @@ import { fetchLiveQuote, fetchCandleHistory } from '../ingestion/finnhubClient';
 import { fetchMarketauxNews } from '../ingestion/marketauxClient';
 import { computeTechnicalIndicators } from '../signal-engine/indicators';
 import { calculateProbabilityScore } from '../signal-engine/probability';
+import { getMacroYieldState } from '../market/macroYield';
+import { getCoTState, checkCoTVeto } from '../market/cotTracker';
 import { getSystemSettings, updateSystemSettings, upsertSubscriber, deactivateSubscriber } from '../db/localDb';
 import { DEFAULT_SYMBOLS } from '../constants/defaultSymbols';
 import { enrichArticleWithThaiSummary } from '../ingestion/thaiNewsHelper';
@@ -331,21 +333,33 @@ export async function handleTelegramCommand(
     await sendTelegramReply(chatId, `⚡ <i>กำลังดึงราคาและคำนวณสัญญาณเทคนิคสดของ ${sym.ticker}...</i>`);
 
     try {
-      const [quote, candles, news] = await Promise.all([
+      const [quote, candles, news, macroYield, rawCotState] = await Promise.all([
         fetchLiveQuote(sym.ticker, sym.asset_type),
         fetchCandleHistory(sym.ticker, sym.asset_type, 'D', 60),
         fetchMarketauxNews([sym.ticker]),
+        getMacroYieldState(sym.ticker, sym.asset_type),
+        getCoTState(sym.ticker, sym.asset_type)
       ]);
 
       const indicators = computeTechnicalIndicators(candles, sym.ticker, '1D');
-      const signal = calculateProbabilityScore(
+      let signal = calculateProbabilityScore(
         sym.ticker,
         quote.price,
         quote.change_percent || 0,
         sym.asset_type,
         indicators,
-        news
+        news,
+        undefined,
+        macroYield,
+        rawCotState
       );
+
+      const cotState = checkCoTVeto(signal.direction, rawCotState);
+      if (cotState.veto_signal) {
+        signal = calculateProbabilityScore(
+          sym.ticker, quote.price, quote.change_percent || 0, sym.asset_type, indicators, news, undefined, macroYield, cotState
+        );
+      }
 
       const isBuy = signal.direction.includes('BUY');
       const isSell = signal.direction.includes('SELL');

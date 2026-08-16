@@ -5,6 +5,8 @@ import { fetchMarketauxNews } from '@/lib/ingestion/marketauxClient';
 import { computeTechnicalIndicators } from '@/lib/signal-engine/indicators';
 import { calculateProbabilityScore } from '@/lib/signal-engine/probability';
 import { generateAIAnalysis } from '@/lib/signal-engine/aiAnalyst';
+import { getMacroYieldState } from '@/lib/market/macroYield';
+import { getCoTState, checkCoTVeto } from '@/lib/market/cotTracker';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -28,29 +30,43 @@ export async function GET(
       alert_threshold: 0.70,
     };
 
-    // Parallel fetch of Quote, Candles, and News
-    const [quote, candles, newsArticles] = await Promise.all([
+    // Parallel fetch of Quote, Candles, News, and Macro data
+    const [quote, candles, newsArticles, macroYield, rawCotState] = await Promise.all([
       fetchLiveQuote(ticker, symbolInfo.asset_type),
       fetchCandleHistory(ticker, symbolInfo.asset_type, 'D', 60),
       fetchMarketauxNews([ticker]),
+      getMacroYieldState(ticker, symbolInfo.asset_type as any),
+      getCoTState(ticker, symbolInfo.asset_type as any)
     ]);
 
     const indicators = computeTechnicalIndicators(candles, ticker, '1D');
-    const signal = calculateProbabilityScore(
+    let signal = calculateProbabilityScore(
       ticker,
       quote.price,
       quote.change_percent || 0,
-      symbolInfo.asset_type,
+      symbolInfo.asset_type as any,
       indicators,
-      newsArticles
+      newsArticles,
+      undefined,
+      macroYield,
+      rawCotState
     );
+
+    const cotState = checkCoTVeto(signal.direction, rawCotState);
+    if (cotState.veto_signal) {
+      signal = calculateProbabilityScore(
+        ticker, quote.price, quote.change_percent || 0, symbolInfo.asset_type as any, indicators, newsArticles, undefined, macroYield, cotState
+      );
+    }
 
     const aiAnalysis = await generateAIAnalysis(
       ticker,
       quote.price,
       signal,
       indicators,
-      newsArticles
+      newsArticles,
+      macroYield,
+      cotState
     );
 
     return NextResponse.json({

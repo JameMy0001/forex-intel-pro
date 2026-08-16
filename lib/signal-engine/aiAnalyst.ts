@@ -1,6 +1,8 @@
 import { AIAnalysisOutput, SignalOutput, TechnicalIndicators, NewsArticle } from '../types';
 import { resilientFetch } from '../ingestion/rateLimiter';
 import { getMarketStatus } from '../market/marketSchedule';
+import { MacroYieldResult } from '../market/macroYield';
+import { CoTResult } from '../market/cotTracker';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
@@ -12,7 +14,9 @@ export async function generateAIAnalysis(
   price: number,
   signal: SignalOutput,
   indicators: TechnicalIndicators,
-  newsArticles: NewsArticle[]
+  newsArticles: NewsArticle[],
+  macroYield?: MacroYieldResult,
+  cotState?: CoTResult
 ): Promise<AIAnalysisOutput> {
   const newsContext = newsArticles
     .slice(0, 5)
@@ -39,13 +43,15 @@ export async function generateAIAnalysis(
 - จุดตัดขาดทุน (Stop Loss): ${signal.stop_loss}
 - จุดทำกำไร (TP1 / TP2): ${signal.take_profit_1} / ${signal.take_profit_2}
 
-อินดิเคเตอร์ทางเทคนิค:
-- RSI (14): ${indicators.rsi_14}
-- MACD: Value ${indicators.macd_value}, Signal ${indicators.macd_signal}, Hist ${indicators.macd_histogram}
-- Bollinger Bands: บน ${indicators.bollinger_upper}, กลาง ${indicators.bollinger_middle}, ล่าง ${indicators.bollinger_lower}
-- EMA 20: ${indicators.ema_20}, EMA 50: ${indicators.ema_50}, EMA 200: ${indicators.ema_200}
-- ATR (ความผันผวน): ${indicators.atr_14}
+อินดิเคเตอร์ทางเทคนิค & Smart Money Concepts (SMC):
+- RSI (14): ${indicators.rsi_14}, MACD: ${indicators.macd_value}
 - แนวโน้ม Trend: ${indicators.trend_bias}
+- FVG (Fair Value Gap): ${indicators.smc_fvg_type || 'NONE'}
+- Liquidity Sweep (ล่า Stop Loss): ${indicators.smc_liquidity_sweep || 'NONE'}
+
+ข้อมูลเชิงลึกระดับสถาบันการเงิน (God-Tier Data):
+- Macro Yield Arbitrage: ${macroYield ? `Signal=${macroYield.arbitrage_signal}, US10Y=${macroYield.us10y_rate}% (Change ${macroYield.us10y_change.toFixed(2)}%), DXY=${macroYield.dxy_rate} (Change ${macroYield.dxy_change.toFixed(2)}%)` : 'N/A'}
+- Institutional CoT / Dark Pool (การถือครองของกองทุน): ${cotState ? `Hedge Fund Positioning=${cotState.net_positioning}, VETO Signal=${cotState.veto_signal}` : 'N/A'}
 
 ข่าวสารและปัจจัยล่าสุด:
 ${newsContext || 'ไม่มีข่าวเฉพาะเจาะจง ตลาดเคลื่อนไหวตาม Technical & Yields'}

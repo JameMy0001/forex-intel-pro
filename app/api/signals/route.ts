@@ -4,6 +4,8 @@ import { fetchLiveQuote, fetchCandleHistory } from '@/lib/ingestion/finnhubClien
 import { getCachedDailyNews } from '@/lib/ingestion/newsCache';
 import { computeTechnicalIndicators } from '@/lib/signal-engine/indicators';
 import { calculateProbabilityScore, applyProbabilityPenalty } from '@/lib/signal-engine/probability';
+import { getMacroYieldState } from '@/lib/market/macroYield';
+import { getCoTState, checkCoTVeto } from '@/lib/market/cotTracker';
 import { generateAIAnalysis } from '@/lib/signal-engine/aiAnalyst';
 
 export const dynamic = 'force-dynamic';
@@ -40,24 +42,36 @@ export async function GET(request: Request) {
     // Parallel fetch & compute signals
     const signalPromises = symbols.map(async (sym) => {
       try {
-        const [quote, candles1D, candles4H] = await Promise.all([
+        const [quote, candles1D, candles4H, macroYield, rawCotState] = await Promise.all([
           fetchLiveQuote(sym.ticker, sym.asset_type),
           fetchCandleHistory(sym.ticker, sym.asset_type, 'D', 60),
           fetchCandleHistory(sym.ticker, sym.asset_type, '240', 80), // 4H timeframe
+          getMacroYieldState(sym.ticker, sym.asset_type),
+          getCoTState(sym.ticker, sym.asset_type)
         ]);
 
         const indicators = computeTechnicalIndicators(candles1D, sym.ticker, '1D');
         const indicators4H = candles4H.length > 30 ? computeTechnicalIndicators(candles4H, sym.ticker, '4H') : undefined;
 
-        const signal = calculateProbabilityScore(
+        let signal = calculateProbabilityScore(
           sym.ticker,
           quote.price,
           quote.change_percent || 0,
           sym.asset_type,
           indicators,
           newsArticles,
-          indicators4H
+          indicators4H,
+          macroYield,
+          rawCotState
         );
+
+        const cotState = checkCoTVeto(signal.direction, rawCotState);
+        if (cotState.veto_signal) {
+          // Re-calculate with VETO applied
+          signal = calculateProbabilityScore(
+            sym.ticker, quote.price, quote.change_percent || 0, sym.asset_type, indicators, newsArticles, indicators4H, macroYield, cotState
+          );
+        }
 
         return {
           symbol: sym,
