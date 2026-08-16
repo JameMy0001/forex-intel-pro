@@ -13,7 +13,7 @@ jobs:
       - name: Trigger Live Cloud Ingestion API
         run: |
           echo "Triggering live ingestion endpoint on Vercel..."
-          RESPONSE=$(curl -s -w "\n%{http_code}" https://1intel-pro-jame.vercel.app/api/ingestion/trigger)
+          RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" -w "\n%{http_code}" https://1intel-pro-jame.vercel.app/api/ingestion/trigger)
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | sed '$d')
           echo "HTTP Status Code: $HTTP_CODE"
