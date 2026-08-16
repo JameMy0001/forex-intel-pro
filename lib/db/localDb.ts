@@ -525,3 +525,43 @@ export async function getAllSubscribers(): Promise<TelegramSubscriber[]> {
   }
 }
 
+/**
+ * 7-Day Rolling Retention: Prune old signals, prices, and news to keep database lean forever
+ */
+export async function pruneOldRecords(daysToKeep: number = 7): Promise<{
+  deletedSignals: number;
+  deletedPrices: number;
+  deletedNews: number;
+}> {
+  try {
+    await ensureTables();
+    const db = getDbClient();
+    const cutoff = `-${daysToKeep} days`;
+
+    const [resSignals, resPrices, resNews] = await Promise.all([
+      db.execute({
+        sql: `DELETE FROM signals WHERE computed_at < datetime('now', ?)`,
+        args: [cutoff],
+      }),
+      db.execute({
+        sql: `DELETE FROM price_snapshots WHERE timestamp < datetime('now', ?)`,
+        args: [cutoff],
+      }),
+      db.execute({
+        sql: `DELETE FROM news WHERE published_at < datetime('now', ?)`,
+        args: [cutoff],
+      }),
+    ]);
+
+    return {
+      deletedSignals: resSignals.rowsAffected || 0,
+      deletedPrices: resPrices.rowsAffected || 0,
+      deletedNews: resNews.rowsAffected || 0,
+    };
+  } catch (err) {
+    console.error('[DB Auto-Prune] Error during cleanup:', err);
+    return { deletedSignals: 0, deletedPrices: 0, deletedNews: 0 };
+  }
+}
+
+

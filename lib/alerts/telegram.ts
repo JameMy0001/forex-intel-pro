@@ -1,10 +1,11 @@
 import { SignalOutput, AIAnalysisOutput } from '../types';
-
 import { getActiveSubscribers } from '../db/localDb';
+import { ValidationResult } from '../signal-engine/aiValidator';
 
 export async function sendTelegramSignalAlert(
   signal: SignalOutput,
-  aiAnalysis?: AIAnalysisOutput
+  aiAnalysis?: AIAnalysisOutput,
+  validatorResult?: ValidationResult
 ): Promise<{ success: boolean; messageId?: number; count?: number; error?: string }> {
   const token = process.env.TELEGRAM_BOT_TOKEN || '';
   const defaultChatId = process.env.TELEGRAM_CHAT_ID || '6270422059';
@@ -46,6 +47,12 @@ export async function sendTelegramSignalAlert(
   text += `• <b>Take Profit 2 (TP2):</b> <code>${signal.take_profit_2}</code>\n`;
   text += `• <b>Risk/Reward Ratio:</b> 1:${signal.risk_reward_ratio}\n\n`;
 
+  if (validatorResult) {
+    text += `🛡️ <b>การประเมินโดย AI Risk Validator:</b>\n`;
+    text += `• <b>ระดับความเสี่ยง:</b> <b>${validatorResult.riskRating} Risk (ความเชื่อมั่น ${validatorResult.validatorConfidence}%)</b> 🟢\n`;
+    text += `• <b>ผลการวิเคราะห์:</b> ${validatorResult.validationNotes}\n\n`;
+  }
+
   text += `🧠 <b>องค์ประกอบการวิเคราะห์ (Signals Breakdown):</b>\n`;
   text += `• Sentiment ข่าวการเงิน: <b>${(signal.sentiment_component >= 0 ? '+' : '') + (signal.sentiment_component * 100).toFixed(0)}%</b>\n`;
   text += `• โมเมนตัมเทคนิค (RSI/MACD): <b>${(signal.technical_component >= 0 ? '+' : '') + (signal.technical_component * 100).toFixed(0)}%</b>\n`;
@@ -60,7 +67,7 @@ export async function sendTelegramSignalAlert(
   }
 
   text += `⏰ <i>เวลาบันทึกสัญญาณ: ${new Date().toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok' })} (เวลาไทย)</i>\n`;
-  text += `⚡ <i>Nexus Intel Pro • Institutional Quantitative Engine</i>`;
+  text += `⚡ <i>Nexus Intel Pro • Dual-Agent Quantitative Engine</i>`;
 
   const url = `https://api.telegram.org/bot${token}/sendMessage`;
   let successCount = 0;

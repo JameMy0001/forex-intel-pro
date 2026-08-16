@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { TrendingUp, TrendingDown } from 'lucide-react';
+import { getMarketStatus } from '@/lib/market/marketSchedule';
 
 interface TickerItem {
   ticker: string;
@@ -16,6 +17,8 @@ interface MarketTickerProps {
 }
 
 export const MarketTicker: React.FC<MarketTickerProps> = ({ items = [] }) => {
+  const marketStatus = getMarketStatus('forex');
+
   const defaultItems: TickerItem[] = [
     { ticker: 'EURUSD', name: 'EUR/USD', price: 1.0845, changePercent: 0.22 },
     { ticker: 'GBPUSD', name: 'GBP/USD', price: 1.2930, changePercent: -0.15 },
@@ -32,9 +35,9 @@ export const MarketTicker: React.FC<MarketTickerProps> = ({ items = [] }) => {
   return (
     <div className="w-full bg-[#0c101a] border-b border-[#1a2333] py-2 px-4 overflow-x-auto scrollbar-none">
       <div className="flex items-center space-x-6 min-w-max text-xs">
-        <div className="flex items-center gap-1.5 text-slate-500 font-mono text-[10px] uppercase font-bold tracking-wider pl-2 border-r border-slate-800 pr-4">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-          Global Pulse
+        <div className="flex items-center gap-2 text-slate-400 font-mono text-[10px] uppercase font-bold tracking-wider pl-2 border-r border-slate-800 pr-4">
+          <span className={`w-2 h-2 rounded-full ${marketStatus.isOpen ? 'bg-emerald-400 animate-pulse' : 'bg-amber-500'}`}></span>
+          <span>{marketStatus.isOpen ? marketStatus.sessionName : '💤 ตลาดปิดทำการ (Weekend Standby)'}</span>
         </div>
         {displayItems.map((item) => {
           const isUp = item.changePercent >= 0;
