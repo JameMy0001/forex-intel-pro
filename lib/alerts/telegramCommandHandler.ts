@@ -373,14 +373,21 @@ export async function handleTelegramCommand(
       msg += `🎯 <b>สัญญาณ (Action):</b> <b>${actionText}</b>\n`;
       msg += `📊 <b>อัตราการชนะ (Win Rate):</b> <b>${winRate}%</b> (${signal.confidence_level} Conviction)\n\n`;
 
-      msg += `📱 <b>พารามิเตอร์สำหรับ MetaTrader 5 (MT5):</b>\n`;
-      msg += `<i>(แตะที่ตัวเลขเพื่อคัดลอกไปใส่ใน MT5 บนมือถือ)</i>\n`;
-      msg += `• <b>Order:</b> <b>${isBuy ? 'BUY 🟢' : isSell ? 'SELL 🔴' : 'WAIT 🟡'}</b>\n`;
-      msg += `• <b>Entry:</b> <code>${signal.recommended_entry}</code>\n`;
-      msg += `• <b>Stop Loss (SL):</b> <code>${signal.stop_loss}</code>\n`;
-      msg += `• <b>Take Profit 1 (TP1):</b> <code>${signal.take_profit_1}</code>\n`;
-      msg += `• <b>Take Profit 2 (TP2):</b> <code>${signal.take_profit_2}</code>\n`;
-      msg += `• <b>Risk/Reward:</b> 1:${signal.risk_reward_ratio}\n\n`;
+      if (signal.explanation) {
+        msg += `🛡️ <b>God-Tier Institutional Shield:</b>\n`;
+        msg += `<i>${signal.explanation.replace(/\[|\]/g, '')}</i>\n\n`;
+      }
+
+      if (isBuy || isSell) {
+        msg += `📱 <b>พารามิเตอร์สำหรับ MetaTrader 5 (MT5):</b>\n`;
+        msg += `<i>(แตะที่ตัวเลขเพื่อคัดลอกไปใส่ใน MT5 บนมือถือ)</i>\n`;
+        msg += `• <b>Order:</b> <b>${isBuy ? 'BUY 🟢' : 'SELL 🔴'}</b>\n`;
+        msg += `• <b>Entry:</b> <code>${signal.recommended_entry}</code>\n`;
+        msg += `• <b>Stop Loss (SL):</b> <code>${signal.stop_loss}</code>\n`;
+        msg += `• <b>Take Profit 1 (TP1):</b> <code>${signal.take_profit_1}</code>\n`;
+        msg += `• <b>Take Profit 2 (TP2):</b> <code>${signal.take_profit_2}</code>\n`;
+        msg += `• <b>Risk/Reward:</b> 1:${signal.risk_reward_ratio}\n\n`;
+      }
 
       msg += `🧠 <b>องค์ประกอบทางเทคนิค:</b>\n`;
       msg += `• RSI (14): <b>${indicators.rsi_14.toFixed(1)}</b>\n`;
