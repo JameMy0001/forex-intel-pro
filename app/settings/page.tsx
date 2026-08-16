@@ -27,7 +27,7 @@ export default function SettingsPage() {
 
   // Focus & Alert Settings State
   const [focusSymbol, setFocusSymbol] = useState<string>('ALL');
-  const [minAlertProbability, setMinAlertProbability] = useState<number>(0.70);
+  const [minAlertProbability, setMinAlertProbability] = useState<number>(0.80);
   const [telegramEnabled, setTelegramEnabled] = useState<boolean>(true);
   const [activeSymbols, setActiveSymbols] = useState<string[]>(DEFAULT_SYMBOLS.map((s) => s.ticker));
   const [savingSettings, setSavingSettings] = useState<boolean>(false);
@@ -92,7 +92,7 @@ export default function SettingsPage() {
 
         if (json.success && json.settings) {
           setFocusSymbol(json.settings.focus_symbol || 'ALL');
-          setMinAlertProbability(json.settings.min_alert_probability || 0.70);
+          setMinAlertProbability(json.settings.min_alert_probability || 0.80);
           setTelegramEnabled(json.settings.telegram_enabled !== false);
           if (Array.isArray(json.settings.active_symbols)) {
             setActiveSymbols(json.settings.active_symbols);
@@ -619,7 +619,7 @@ export default function SettingsPage() {
         <div className="p-3 rounded-lg bg-blue-950/30 border border-blue-500/20 text-xs text-blue-300 font-mono flex items-center gap-2">
           <Send className="w-4 h-4 text-blue-400 shrink-0" />
           <span>
-            เมื่อมีสัญญาณเทรด Win Rate $\ge$ {((minAlertProbability || 0.7) * 100).toFixed(0)}% ระบบจะส่งข้อความแจ้งเตือนหาทุกคนในรายชื่อนี้พร้อมกันทันที
+            เมื่อมีสัญญาณเทรด Win Rate &ge; {((minAlertProbability || 0.8) * 100).toFixed(0)}% ระบบจะส่งข้อความแจ้งเตือนหาทุกคนในรายชื่อนี้พร้อมกันทันที
           </span>
         </div>
       </div>

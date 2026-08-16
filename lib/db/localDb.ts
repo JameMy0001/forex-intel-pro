@@ -193,7 +193,7 @@ export async function ensureTables(): Promise<void> {
         await db.execute(`
           INSERT OR IGNORE INTO system_settings (key, value) VALUES
           ('focus_symbol', 'ALL'),
-          ('min_alert_probability', '0.70'),
+          ('min_alert_probability', '0.80'),
           ('telegram_enabled', 'true'),
           ('active_symbols', '["EURUSD","GBPUSD","USDJPY","GBPJPY","EURJPY","AUDUSD","USDCHF","USDCAD","XAUUSD","AAPL","NVDA","TSLA","MSFT","AMZN","GOOGL","SPY"]')
         `);

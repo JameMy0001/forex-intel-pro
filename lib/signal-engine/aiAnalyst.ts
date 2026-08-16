@@ -20,8 +20,9 @@ export async function generateAIAnalysis(
 
   if (GEMINI_API_KEY) {
     try {
-      const prompt = `คุณคือ Senior Macro & Quantitative Hedge Fund Trader ระดับโลก 
-กรุณาวิเคราะห์สินทรัพย์ต่อไปนี้ และสรุปมุมมองเชิงลึก แผนการเทรด และปัจจัยมหภาคเป็น "ภาษาไทยที่เข้าใจง่าย กระชับ ตรงประเด็นสำหรับ Trader มืออาชีพ" ในรูปแบบ JSON:
+      const prompt = `คุณคือ Senior Quantitative Risk Manager ระดับโลก
+ข้อมูลสำคัญ: ผู้ใช้งานมีทุนการเทรดจำกัดมากเพียง $10 และใช้ Leverage 1:200 (เทรดได้สูงสุด 0.01 หลอด) การขยับผิดทางเพียง 20-30 pips จะทำให้พอร์ตแตกทันที (Stop Out)
+กรุณาวิเคราะห์สินทรัพย์ต่อไปนี้ และสรุปมุมมองเชิงลึก แผนการเทรดแบบ "สไนเปอร์ (Sniper / Scalping) เท่านั้น ห้ามทนลากเด็ดขาด" เป็น "ภาษาไทยที่เข้าใจง่าย กระชับ" ในรูปแบบ JSON:
 
 ข้อมูลสินทรัพย์:
 - สินทรัพย์: ${ticker}
@@ -47,7 +48,7 @@ ${newsContext || 'ไม่มีข่าวเฉพาะเจาะจง �
   "macro_catalyst": "สรุปปัจจัยมหภาคหลัก 1-2 ประโยคภาษาไทย (เช่น ดอกเบี้ย Fed, ข้อมูลเศรษฐกิจ, ค่าเงินดอลลาร์ หรือแรงซื้อสถาบัน)",
   "bull_case": "มุมมองฝั่งซื้อ/ขึ้น: เหตุผลและปัจจัยหนุนเชิงบวก (1-2 ประโยคสั้นๆ)",
   "bear_case": "มุมมองฝั่งขาย/ลง: ความเสี่ยงและแนวต้านที่ต้องระวัง (1-2 ประโยคสั้นๆ)",
-  "trade_thesis": "แผนการเทรดสรุป: อธิบายเหตุผลที่ความน่าจะเป็นนี้เกิดขึ้น และคำแนะนำเชิงกลยุทธ์สำหรับเทรดเดอร์ใน MT5 (2-3 ประโยคภาษาไทยที่ชัดเจน)",
+  "trade_thesis": "แผนการเทรดสรุป: เน้นย้ำว่าผู้ใช้ทุน $10 ต้องเก็บสั้นหนีเร็ว (Scalping) วาง SL แคบๆ ห้ามถือข้ามวัน แนะนำกลยุทธ์สำหรับ MT5 แบบจำกัดความเสี่ยงสูงสุด (2-3 ประโยค)",
   "invalidation_level": ${signal.stop_loss || price * 0.98},
   "support_levels": [${indicators.bollinger_lower}, ${indicators.ema_50}],
   "resistance_levels": [${indicators.bollinger_upper}, ${indicators.ema_20}]
@@ -123,22 +124,22 @@ ${newsContext || 'ไม่มีข่าวเฉพาะเจาะจง �
     macroCatalyst = `นโยบายดอกเบี้ยของธนาคารกลางญี่ปุ่น (BOJ) ควบคู่กับ Yields สหรัฐฯ กำหนดทิศทางการไหลของเงินทุนในคู่เงินเยน`;
     bullCase = `หากดอลลาร์สหรัฐฯ แข็งค่าต่อเนื่อง จะผลักดันให้เกิดแรงซื้อดันราคาขึ้นทดสอบ ${indicators.bollinger_upper.toFixed(3)}`;
     bearCase = `ความกังวลการแทรกแซงค่าเงินจากทางการญี่ปุ่นอาจทำให้เกิดแรงเทขายรวดเร็วลงสู่แนวรับ ${indicators.bollinger_lower.toFixed(3)}`;
-    thesis = `โมเดลคำนวณความน่าจะเป็น ${signal.direction} อยู่ที่ ${(signal.probability_score * 100).toFixed(1)}% ตามแนวโน้มโมเมนตัม RSI (${indicators.rsi_14.toFixed(1)}) แนะนำเข้าเทรดโดยตั้ง Stop Loss ที่ ${invalidation.toFixed(3)}`;
+    thesis = `(โหมดสไนเปอร์ $10) ความน่าจะเป็น ${signal.direction} อยู่ที่ ${(signal.probability_score * 100).toFixed(1)}% แนะนำ Scalping เก็บสั้นๆ ตั้ง SL แน่นๆ ที่ ${invalidation.toFixed(3)} ห้ามทนลากเด็ดขาด`;
   } else if (ticker.includes('EUR') || ticker.includes('GBP')) {
     macroCatalyst = `ส่วนต่างอัตราดอกเบี้ยระหว่าง Fed และ ECB/BOE รวมถึงตัวเลขเงินเฟ้อ CPI กำหนดทิศทางค่าเงินหลัก`;
     bullCase = `ราคาทรงตัวเหนือ EMA 50 พร้อมสัญญาณ Sentiment บวก (+${(Math.abs(signal.sentiment_component) * 100).toFixed(0)}%)`;
     bearCase = `หากหลุดแนวรับสำคัญที่ ${indicators.bollinger_lower.toFixed(4)} อาจเกิดคลื่นแรงขายต่อเนื่อง`;
-    thesis = `ระบบให้คะแนนความน่าจะเป็น ${(signal.probability_score * 100).toFixed(1)}% ในทิศทาง ${signal.direction} แนะนำบริหาร Reward ต่อ Risk อย่างน้อย 1:2`;
+    thesis = `(โหมดสไนเปอร์ $10) โอกาสชนะ ${(signal.probability_score * 100).toFixed(1)}% ทิศทาง ${signal.direction} บริหาร Margin ให้ดี ตั้งจุดยอมแพ้หนีให้ไวที่สุด`;
   } else if (ticker === 'XAUUSD') {
     macroCatalyst = `แรงซื้อสะสมทองคำของธนาคารกลางโลก ความเสี่ยงภูมิรัฐศาสตร์ และการป้องกันความเสี่ยงเงินเฟ้อ`;
     bullCase = `แรงซื้อหนุนอย่างแข็งแกร่งเมื่อราคาย่อตัว โมเมนตัมยืนเหนือ EMA 20 ($${indicators.ema_20.toFixed(2)})`;
     bearCase = `หาก Bond Yields สหรัฐฯ ดีดตัวขึ้นแรง อาจกดดันให้เกิดแรงขายทำกำไรระยะสั้นลงหา $${indicators.ema_50.toFixed(2)}`;
-    thesis = `ทองคำมีคะแนนความน่าจะเป็น ${(signal.probability_score * 100).toFixed(1)}% ในฝั่ง ${signal.direction} หาจังหวะเข้าใกล้ $${price.toFixed(2)} วางเป้าหมายแรกที่ $${signal.take_profit_1?.toFixed(2)}`;
+    thesis = `(โหมดสไนเปอร์ $10) ทองคำผันผวนสูงมาก! โอกาส ${(signal.probability_score * 100).toFixed(1)}% ไปทาง ${signal.direction} เข้าไวออกไวที่ $${price.toFixed(2)} ห้ามถือข้ามคืนเด็ดขาด`;
   } else {
     macroCatalyst = `กระแสการลงทุนในกลุ่มเทคโนโลยีและ AI ควบคู่กับผลประกอบการไตรมาสล่าสุดของบริษัท`;
     bullCase = `กระแสเงินสดแข็งแกร่งและราคายืนเหนือเส้นค่าเฉลี่ย 50 วัน ($${indicators.ema_50.toFixed(2)})`;
     bearCase = `แรงกดดันจากการประเมินมูลค่า (Valuation) บริเวณแนวต้าน $${indicators.bollinger_upper.toFixed(2)}`;
-    thesis = `${ticker} มีสัญญาณ ${signal.direction} ความน่าจะเป็น ${(signal.probability_score * 100).toFixed(1)}% จุดยอมแพ้คุมความเสี่ยงอยู่ที่ $${invalidation.toFixed(2)}`;
+    thesis = `(โหมดสไนเปอร์ $10) ${ticker} สัญญาณ ${signal.direction} ${(signal.probability_score * 100).toFixed(1)}% ตัดขาดทุนทันทีเมื่อผิดทางที่ $${invalidation.toFixed(2)}`;
   }
 
   return {

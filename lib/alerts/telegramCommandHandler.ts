@@ -432,7 +432,7 @@ export async function handleTelegramCommand(
       const settings = await getSystemSettings();
       await sendTelegramReply(
         chatId,
-        `🛡️ <b>เกณฑ์วินเรทปัจจุบัน:</b> <b>${((settings.min_alert_probability || 0.7) * 100).toFixed(0)}% ขึ้นไป</b>\n\nหากต้องการเปลี่ยน กรุณาพิมพ์ตัวเลขระหว่าง 60 ถึง 90 เช่น:\n• <code>/winrate 75</code> (ตั้งเกณฑ์ 75%)\n• <code>/winrate 80</code> (ตั้งเกณฑ์ 80% - แนะนำ)\n• <code>/winrate 85</code> (ตั้งเกณฑ์ 85%)`,
+        `🛡️ <b>เกณฑ์วินเรทปัจจุบัน:</b> <b>${((settings.min_alert_probability || 0.8) * 100).toFixed(0)}% ขึ้นไป</b>\n\nหากต้องการเปลี่ยน กรุณาพิมพ์ตัวเลขระหว่าง 60 ถึง 90 เช่น:\n• <code>/winrate 75</code> (ตั้งเกณฑ์ 75%)\n• <code>/winrate 80</code> (ตั้งเกณฑ์ 80% - แนะนำ)\n• <code>/winrate 85</code> (ตั้งเกณฑ์ 85%)`,
         QUICK_KEYBOARD
       );
       return;
@@ -454,7 +454,7 @@ export async function handleTelegramCommand(
     let msg = `📊 <b>สถานะระบบ NEXUS INTEL PRO 2.0</b>\n`;
     msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
     msg += `🎯 <b>Focus Lock:</b> <b>${settings.focus_symbol}</b> ${settings.focus_symbol !== 'ALL' ? '(คำนวณเฉพาะคู่นี้)' : '(คำนวณทุกคู่)'}\n`;
-    msg += `🛡️ <b>เกณฑ์ Win Rate แจ้งเตือน:</b> <b>${((settings.min_alert_probability || 0.7) * 100).toFixed(0)}% ขึ้นไป</b>\n`;
+    msg += `🛡️ <b>เกณฑ์ Win Rate แจ้งเตือน:</b> <b>${((settings.min_alert_probability || 0.8) * 100).toFixed(0)}% ขึ้นไป</b>\n`;
     msg += `🔔 <b>สถานะ Telegram Bot:</b> <b>${settings.telegram_enabled ? 'เปิดใช้งาน (Active 🟢)' : 'ปิดการแจ้งเตือน (Disabled 🔴)'}</b>\n`;
     msg += `☁️ <b>Cloud Database (Turso):</b> <b>เชื่อมต่อสมบูรณ์ 24/7 🟢</b>\n`;
     msg += `🌐 <b>Web Terminal:</b> <a href="https://1intel-pro-jame.vercel.app">1intel-pro-jame.vercel.app</a>\n\n`;

@@ -181,25 +181,18 @@ export function calculateProbabilityScore(
   // Steeper slope factor (k=2.2) to give distinct probability spread
   const probability = Number(sigmoid(rawDirectionalScore * 2.5).toFixed(3));
 
-  // 6. Direction & Confidence Level Mapping
+  // 6. Direction & Confidence Level Mapping (Initial check for SL calculation)
   let direction: SignalDirection = 'NEUTRAL';
   let confidence: ConfidenceLevel = 'MODERATE';
 
   if (probability >= 0.72) {
     direction = 'STRONG_BUY';
-    confidence = 'VERY_HIGH';
   } else if (probability >= 0.58) {
     direction = 'BUY';
-    confidence = 'HIGH';
   } else if (probability <= 0.28) {
     direction = 'STRONG_SELL';
-    confidence = 'VERY_HIGH';
   } else if (probability <= 0.42) {
     direction = 'SELL';
-    confidence = 'HIGH';
-  } else {
-    direction = 'NEUTRAL';
-    confidence = 'MODERATE';
   }
 
   // 7. Calculate Suggested Trade Setup (Entry, Stop Loss, Take Profit via ATR)
@@ -229,19 +222,6 @@ export function calculateProbabilityScore(
     rr = Number(((currentPrice - tp1) / (stopLoss - currentPrice)).toFixed(2));
   }
 
-  // Directional Win Rate (e.g. 72% for STRONG_SELL instead of 28%)
-  const winRate = isBearish
-    ? Number(((1 - probability) * 100).toFixed(1))
-    : isBullish
-    ? Number((probability * 100).toFixed(1))
-    : 50.0;
-
-  // Expected Value (EV)
-  // EV = (Win Rate * Avg Win) - (Loss Rate * Avg Loss)
-  // Assuming 1 unit of risk (Loss = 1) and RR for Win
-  const winProb = winRate / 100;
-  const expectedValue = Number((winProb * rr - (1 - winProb) * 1).toFixed(2));
-
   // Position Sizing (Fixed 1% Risk)
   const stopLossDistancePercent = Math.abs(currentPrice - stopLoss) / currentPrice;
   let positionSizePercent = stopLossDistancePercent > 0 ? Number((0.01 / stopLossDistancePercent).toFixed(4)) : 0;
@@ -250,14 +230,62 @@ export function calculateProbabilityScore(
     positionSizePercent = 0.15;
   }
 
+  // --- Micro-Account Sniper Guard ---
+  let finalProbability = probability;
+  let riskPenaltyText = '';
+  // Threshold: 0.15% price move (~15 pips on EURUSD)
+  const maxSafeDistance = 0.0015;
+  
+  if (stopLossDistancePercent > maxSafeDistance && direction !== 'NEUTRAL') {
+    const excess = stopLossDistancePercent - maxSafeDistance;
+    // Heavy penalty for every 0.1% excess
+    const penaltyMultiplier = Math.max(0.1, 1 - (excess * 200)); 
+    if (finalProbability > 0.5) {
+      finalProbability = 0.5 + (finalProbability - 0.5) * penaltyMultiplier;
+    } else {
+      finalProbability = 0.5 - (0.5 - finalProbability) * penaltyMultiplier;
+    }
+    finalProbability = Number(finalProbability.toFixed(3));
+    riskPenaltyText = ` [⚠️ โดนหักคะแนน: ความผันผวนสูงเกินลิมิตทุน $10]`;
+  }
+
+  // Recalculate Final Direction (Sniper Mode Thresholds)
+  if (finalProbability >= 0.80) {
+    direction = 'STRONG_BUY';
+    confidence = 'VERY_HIGH';
+  } else if (finalProbability >= 0.70) {
+    direction = 'BUY';
+    confidence = 'HIGH';
+  } else if (finalProbability <= 0.20) {
+    direction = 'STRONG_SELL';
+    confidence = 'VERY_HIGH';
+  } else if (finalProbability <= 0.30) {
+    direction = 'SELL';
+    confidence = 'HIGH';
+  } else {
+    direction = 'NEUTRAL';
+    confidence = 'MODERATE';
+  }
+
+  // Directional Win Rate
+  const winRate = (direction === 'SELL' || direction === 'STRONG_SELL')
+    ? Number(((1 - finalProbability) * 100).toFixed(1))
+    : (direction === 'BUY' || direction === 'STRONG_BUY')
+    ? Number((finalProbability * 100).toFixed(1))
+    : 50.0;
+
+  // Expected Value (EV)
+  const winProb = winRate / 100;
+  const expectedValue = Number((winProb * rr - (1 - winProb) * 1).toFixed(2));
+
   // Explanation Narrative
-  const thaiAction = isBullish ? 'ขาขึ้น (BUY)' : isBearish ? 'ขาลง (SELL)' : 'ไซด์เวย์ (NEUTRAL)';
+  const thaiAction = (direction === 'BUY' || direction === 'STRONG_BUY') ? 'ขาขึ้น (BUY)' : (direction === 'SELL' || direction === 'STRONG_SELL') ? 'ขาลง (SELL)' : 'ไซด์เวย์ (NEUTRAL)';
   const mtfaText = isMtfaAligned ? ' (MTFA Aligned)' : isMtfaConflicting ? ' (MTFA Conflicting)' : '';
-  const explanation = `${direction.replace('_', ' ')} (${thaiAction}): วินเรท ${winRate}% (EV: ${expectedValue > 0 ? '+' : ''}${expectedValue}). ข่าว (${(sentimentComponent >= 0 ? '+' : '') + (sentimentComponent * 100).toFixed(0)}%), ตลาด ${indicators.market_regime}${mtfaText}, RSI (${indicators.rsi_14.toFixed(1)}). SL ใต้โครงสร้างล่าสุด.`;
+  const explanation = `${direction.replace('_', ' ')} (${thaiAction}): วินเรท ${winRate}% (EV: ${expectedValue > 0 ? '+' : ''}${expectedValue}). ข่าว (${(sentimentComponent >= 0 ? '+' : '') + (sentimentComponent * 100).toFixed(0)}%), ตลาด ${indicators.market_regime}${mtfaText}, RSI (${indicators.rsi_14.toFixed(1)}). SL ใต้โครงสร้างล่าสุด${riskPenaltyText}`;
 
   return {
     ticker,
-    probability_score: probability,
+    probability_score: finalProbability,
     win_rate_percent: winRate,
     expected_value: expectedValue,
     position_size_percent: positionSizePercent * 100, // as percentage
