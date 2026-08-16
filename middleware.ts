@@ -34,11 +34,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Allow public API and webhook routes
+  // Allow all internal and external API routes, static files, and assets
   if (
-    pathname.startsWith('/api/telegram') ||
-    pathname.startsWith('/api/ingestion') ||
-    pathname.startsWith('/api/auth') ||
+    pathname.startsWith('/api/') ||
     pathname.startsWith('/_next') ||
     pathname.includes('.')
   ) {
