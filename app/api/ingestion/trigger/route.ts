@@ -8,6 +8,8 @@ import { fetchMarketauxNews } from '@/lib/ingestion/marketauxClient';
 import { sendTelegramSignalAlert } from '@/lib/alerts/telegram';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 export const maxDuration = 60; // Allow full execution time on Vercel Serverless
 
 export async function GET(request: Request) {
