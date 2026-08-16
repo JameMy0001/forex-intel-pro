@@ -1,5 +1,6 @@
 import { AIAnalysisOutput, SignalOutput, TechnicalIndicators, NewsArticle } from '../types';
 import { resilientFetch } from '../ingestion/rateLimiter';
+import { getMarketStatus } from '../market/marketSchedule';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
@@ -18,10 +19,16 @@ export async function generateAIAnalysis(
     .map((a, i) => `${i + 1}. [${a.source}] ${a.thai_headline || a.headline} (Sentiment: ${a.sentiment_score}): ${a.thai_summary || a.summary}`)
     .join('\n');
 
+  const assetType = ticker.includes('USD') || ticker.includes('JPY') || ticker.includes('EUR') || ticker.includes('GBP') ? 'forex' : 'stock';
+  const marketStatus = getMarketStatus(assetType as any, ticker);
+  const spreadWarningText = marketStatus.spread_warning 
+    ? `\n⚠️ ข้อมูลฉุกเฉิน: ขณะนี้อยู่ในช่วงตลาดสภาพคล่องต่ำ (Spread กว้าง) ต้องเตือนผู้ใช้ทุน $10 ให้ระวังการติดลบหนักทันทีที่เข้าออเดอร์` 
+    : '';
+
   if (GEMINI_API_KEY) {
     try {
       const prompt = `คุณคือ Senior Quantitative Risk Manager ระดับโลก
-ข้อมูลสำคัญ: ผู้ใช้งานมีทุนการเทรดจำกัดมากเพียง $10 และใช้ Leverage 1:200 (เทรดได้สูงสุด 0.01 หลอด) การขยับผิดทางเพียง 20-30 pips จะทำให้พอร์ตแตกทันที (Stop Out)
+ข้อมูลสำคัญ: ผู้ใช้งานมีทุนการเทรดจำกัดมากเพียง $10 และใช้ Leverage 1:200 (เทรดได้สูงสุด 0.01 หลอด) การขยับผิดทางเพียง 20-30 pips จะทำให้พอร์ตแตกทันที (Stop Out)${spreadWarningText}
 กรุณาวิเคราะห์สินทรัพย์ต่อไปนี้ และสรุปมุมมองเชิงลึก แผนการเทรดแบบ "สไนเปอร์ (Sniper / Scalping) เท่านั้น ห้ามทนลากเด็ดขาด" เป็น "ภาษาไทยที่เข้าใจง่าย กระชับ" ในรูปแบบ JSON:
 
 ข้อมูลสินทรัพย์:
@@ -140,6 +147,10 @@ ${newsContext || 'ไม่มีข่าวเฉพาะเจาะจง �
     bullCase = `กระแสเงินสดแข็งแกร่งและราคายืนเหนือเส้นค่าเฉลี่ย 50 วัน ($${indicators.ema_50.toFixed(2)})`;
     bearCase = `แรงกดดันจากการประเมินมูลค่า (Valuation) บริเวณแนวต้าน $${indicators.bollinger_upper.toFixed(2)}`;
     thesis = `(โหมดสไนเปอร์ $10) ${ticker} สัญญาณ ${signal.direction} ${(signal.probability_score * 100).toFixed(1)}% ตัดขาดทุนทันทีเมื่อผิดทางที่ $${invalidation.toFixed(2)}`;
+  }
+
+  if (marketStatus.spread_warning) {
+    thesis += ` [⚠️ ระวัง! ช่วงนี้ Spread กว้างมาก ทุน $10 อาจติดลบหนักตั้งแต่เปิดออเดอร์]`;
   }
 
   return {

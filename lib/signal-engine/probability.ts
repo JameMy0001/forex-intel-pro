@@ -6,6 +6,7 @@ import {
   NewsArticle,
   AssetType,
 } from '../types';
+import { getMarketStatus } from '../market/marketSchedule';
 
 /**
  * Standard Sigmoid Function
@@ -247,6 +248,22 @@ export function calculateProbabilityScore(
     }
     finalProbability = Number(finalProbability.toFixed(3));
     riskPenaltyText = ` [⚠️ โดนหักคะแนน: ความผันผวนสูงเกินลิมิตทุน $10]`;
+  }
+
+  // --- Session & Spread Shield ---
+  const marketStatus = getMarketStatus(assetType, ticker);
+  if (direction !== 'NEUTRAL') {
+    if (marketStatus.liquidity === 'LOW') {
+      // Penalty: -15% confidence during low liquidity (wider spreads)
+      if (finalProbability > 0.5) finalProbability -= 0.15;
+      else finalProbability += 0.15;
+      riskPenaltyText += ` [⚠️ Spread กว้าง: เลี่ยงเทรดช่วงนี้]`;
+    } else if (marketStatus.liquidity === 'HIGH') {
+      // Boost: +5% confidence during Overlap (tightest spreads)
+      if (finalProbability > 0.5) finalProbability = Math.min(0.99, finalProbability + 0.05);
+      else finalProbability = Math.max(0.01, finalProbability - 0.05);
+    }
+    finalProbability = Number(finalProbability.toFixed(3));
   }
 
   // Recalculate Final Direction (Sniper Mode Thresholds)

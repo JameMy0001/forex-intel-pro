@@ -5,6 +5,8 @@ export interface MarketStatusResult {
   sessionName: string;
   reason: string;
   bangkokTime: string;
+  liquidity?: 'LOW' | 'MEDIUM' | 'HIGH';
+  spread_warning?: boolean;
 }
 
 // ---- US Federal Market Holiday Detection ----
@@ -139,9 +141,37 @@ export function getMarketStatus(assetType: AssetType = 'forex', ticker?: string)
   }
 
   let session = 'Active Global Trading Session';
-  if (hour >= 5 && hour < 14) session = 'Tokyo / Asian Session 🇯🇵';
-  else if (hour >= 14 && hour < 20) session = 'London / European Session 🇬🇧';
-  else session = 'New York / US Session 🇺🇸';
+  let liquidity: 'LOW' | 'MEDIUM' | 'HIGH' = 'HIGH';
+  let spreadWarning = false;
 
-  return { isOpen: true, sessionName: session, reason: 'ตลาด Forex & สินค้าโภคภัณฑ์ เปิดทำการปกติ 24 ชม.', bangkokTime };
+  if (hour >= 4 && hour < 8) {
+    session = 'Rollover / Early Asian ⚠️';
+    liquidity = 'LOW';
+    spreadWarning = true;
+  } else if (hour >= 8 && hour < 14) {
+    session = 'Tokyo / Asian Session 🇯🇵';
+    liquidity = 'LOW';
+    spreadWarning = true;
+  } else if (hour >= 14 && hour < 19) {
+    session = 'London / European Session 🇬🇧';
+    liquidity = 'MEDIUM';
+    spreadWarning = false;
+  } else if (hour >= 19 && hour < 23) {
+    session = 'London / NY Overlap 🇺🇸🇬🇧 (Best Liquidity)';
+    liquidity = 'HIGH';
+    spreadWarning = false;
+  } else {
+    session = 'New York / US Session 🇺🇸';
+    liquidity = 'MEDIUM';
+    spreadWarning = false;
+  }
+
+  return { 
+    isOpen: true, 
+    sessionName: session, 
+    reason: 'ตลาด Forex & สินค้าโภคภัณฑ์ เปิดทำการปกติ 24 ชม.', 
+    bangkokTime,
+    liquidity,
+    spread_warning: spreadWarning
+  };
 }
