@@ -1,34 +1,24 @@
-name: Ingest Real-time Prices & Signals
+name: Ingest Real-time Prices & Signals 24/7
 
 on:
   schedule:
-    # Run every 5 minutes during market hours
+    # Run every 5 minutes
     - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:
-  ingest-prices:
+  trigger-cloud-ingestion:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run Price Ingestion & Signal Calculator
-        run: npm run cron:prices
-        env:
-          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
-          MARKETAUX_API_KEY: ${{ secrets.MARKETAUX_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      - name: Trigger Live Cloud Ingestion API
+        run: |
+          echo "Triggering live ingestion endpoint on Vercel..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" https://1intel-pro-jame.vercel.app/api/ingestion/trigger)
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          echo "HTTP Status Code: $HTTP_CODE"
+          echo "Response Body: $BODY"
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo "Ingestion request failed with status $HTTP_CODE"
+            exit 1
+          fi

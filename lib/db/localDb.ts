@@ -9,11 +9,15 @@ let tablesInitializedPromise: Promise<void> | null = null;
 
 export function getDbClient(): Client {
   if (!client) {
-    const tursoUrl = process.env.TURSO_DATABASE_URL;
-    const tursoAuthToken = process.env.TURSO_AUTH_TOKEN;
+    const tursoUrl =
+      process.env.TURSO_DATABASE_URL ||
+      'libsql://forex-intel-db-jame.aws-ap-northeast-1.turso.io';
+    const tursoAuthToken =
+      process.env.TURSO_AUTH_TOKEN ||
+      'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODY4MTk2MTYsImlkIjoiMDFhMDA2YmUtZjEwMS03MzVlLWJjMzAtZDljOGRjNjk5NWVmIiwia2lkIjoiYzYyWWgyaDdaVk5zWlVKbDJlUVBRV2VJcTdwVUJvUlA5Sm1mS0R5bGxwYyIsInJpZCI6IjMzMTQ5NmZmLWNhMzMtNDk1MC1hOGZhLWUyNWM0ZjVlZGVmYSJ9.83Hood14CUxhsrRD0KjFvhLQpvpgSMuqmQ6sXCuV6GG_niKm1xt88XuQ10-1oaFRlX6W005j1iBuIsAJOygqDw';
 
-    if (tursoUrl) {
-      // Connect to Turso Cloud Database (e.g. libsql://forex-intel-db-jame.aws-ap-northeast-1.turso.io)
+    if (tursoUrl && tursoAuthToken) {
+      // Connect to Turso Cloud Database (Always synchronized 24/7)
       client = createClient({
         url: tursoUrl,
         authToken: tursoAuthToken,

@@ -63,9 +63,15 @@ export async function GET(request: Request) {
         processed.push({
           ticker: sym.ticker,
           price: quote.price,
-          probability: signal.probability_score,
           direction: signal.direction,
+          winRate: currentWinRate,
+          alertThreshold: alertThreshold,
           alertSent,
+          alertReason: !isActionable
+            ? 'Direction is NEUTRAL'
+            : currentWinRate < alertThreshold
+            ? `Win rate ${currentWinRate}% is below minimum threshold ${alertThreshold}%`
+            : 'Alert triggered and sent to Telegram',
           alertResult,
         });
       } catch (itemErr) {
