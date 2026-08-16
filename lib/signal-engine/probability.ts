@@ -121,13 +121,25 @@ export function calculateProbabilityScore(
   let wTrend = 0.30;
 
   if (assetType === 'stock') {
+    // Stocks: News & earnings drive price more than technicals
     wSentiment = 0.45;
     wTech = 0.35;
     wTrend = 0.20;
   } else if (assetType === 'forex') {
+    // Forex: Macro policy & trend are key drivers
     wSentiment = 0.40;
     wTech = 0.30;
     wTrend = 0.30;
+  } else if (assetType === 'commodity') {
+    // Gold/Commodities: Fear index, DXY correlation — trend & tech dominant
+    wSentiment = 0.30;
+    wTech = 0.35;
+    wTrend = 0.35;
+  } else if (assetType === 'index') {
+    // Indices (SPY): Broad sentiment and trend-following
+    wSentiment = 0.35;
+    wTech = 0.30;
+    wTrend = 0.35;
   }
 
   // Raw combined directional score (-1.0 to +1.0)

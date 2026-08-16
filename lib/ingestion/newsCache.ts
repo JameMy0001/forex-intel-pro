@@ -16,7 +16,7 @@ export async function getCachedDailyNews(
       
       // Check if we have recent news in DB within 12 hours
       const res = await db.execute(`
-        SELECT * FROM news 
+        SELECT * FROM news_articles
         WHERE published_at >= datetime('now', '-12 hours')
         ORDER BY published_at DESC 
         LIMIT 30

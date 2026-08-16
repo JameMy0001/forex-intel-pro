@@ -8,6 +8,7 @@ import { getCachedDailyNews } from '@/lib/ingestion/newsCache';
 import { validateTradeSignal } from '@/lib/signal-engine/aiValidator';
 import { getMarketStatus } from '@/lib/market/marketSchedule';
 import { sendTelegramSignalAlert } from '@/lib/alerts/telegram';
+import { isAlertOnCooldown, logAlertSent } from '@/lib/alerts/alertCooldown';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -61,18 +62,46 @@ export async function GET(request: Request) {
         // 2. Telegram is enabled
         // 3. Direction is BUY or SELL
         // 4. Win Rate >= Threshold (e.g. >= 80%)
+        // 5. Not on cooldown (last alert for this ticker+direction < 4h ago)
         if (
           marketStatus.isOpen &&
           settings.telegram_enabled &&
           isActionable &&
           currentWinRate >= alertThreshold
         ) {
+          // Check cooldown — prevent duplicate alerts within 4 hours
+          const onCooldown = await isAlertOnCooldown(sym.ticker, signal.direction, 240);
+
+          if (onCooldown) {
+            processed.push({
+              ticker: sym.ticker,
+              price: quote.price,
+              direction: signal.direction,
+              winRate: currentWinRate,
+              alertThreshold: alertThreshold,
+              marketStatus: marketStatus.isOpen ? 'OPEN' : 'CLOSED',
+              marketSession: marketStatus.sessionName,
+              alertSent: false,
+              alertReason: `Cooldown active — duplicate ${signal.direction} alert suppressed (< 4h since last alert)`,
+              validator: null,
+              alertResult: null,
+            });
+            await savePriceSnapshot(quote);
+            await saveSignal(signal);
+            continue;
+          }
+
           // 3. Dual-Agent AI Validator (Agent 2 Cross-Checks Risk)
           validatorResult = await validateTradeSignal(signal, indicators, news);
 
           if (validatorResult.isValid) {
             alertResult = await sendTelegramSignalAlert(signal, undefined, validatorResult);
             alertSent = alertResult.success;
+            if (alertSent) {
+              await logAlertSent(sym.ticker, signal.direction, signal.probability_score, `${signal.direction} @ ${signal.recommended_entry}`, 'sent');
+            }
+          } else {
+            await logAlertSent(sym.ticker, signal.direction, signal.probability_score, `BLOCKED: ${validatorResult.validationNotes}`, 'blocked');
           }
         }
 

@@ -165,6 +165,27 @@ export async function ensureTables(): Promise<void> {
         );
       `);
 
+      // Alert history log for auditing and deduplication
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS alerts_log (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          ticker TEXT NOT NULL,
+          direction TEXT NOT NULL,
+          probability_score REAL,
+          channel TEXT DEFAULT 'telegram',
+          message TEXT,
+          status TEXT DEFAULT 'sent',
+          error_message TEXT,
+          sent_at TEXT DEFAULT (datetime('now'))
+        );
+      `);
+
+      // Performance indexes on frequently queried columns
+      await db.execute(`CREATE INDEX IF NOT EXISTS idx_signals_ticker_computed ON signals (ticker, computed_at DESC);`);
+      await db.execute(`CREATE INDEX IF NOT EXISTS idx_price_snapshots_ticker_captured ON price_snapshots (ticker, captured_at DESC);`);
+      await db.execute(`CREATE INDEX IF NOT EXISTS idx_news_articles_published ON news_articles (published_at DESC);`);
+      await db.execute(`CREATE INDEX IF NOT EXISTS idx_alerts_log_ticker ON alerts_log (ticker, sent_at DESC);`);
+
       // Seed default settings
       try {
         await db.execute(`
@@ -544,11 +565,13 @@ export async function pruneOldRecords(daysToKeep: number = 7): Promise<{
         args: [cutoff],
       }),
       db.execute({
-        sql: `DELETE FROM price_snapshots WHERE timestamp < datetime('now', ?)`,
+        // ✅ Fixed: correct column name is captured_at (not timestamp)
+        sql: `DELETE FROM price_snapshots WHERE captured_at < datetime('now', ?)`,
         args: [cutoff],
       }),
       db.execute({
-        sql: `DELETE FROM news WHERE published_at < datetime('now', ?)`,
+        // ✅ Fixed: correct table name is news_articles (not news)
+        sql: `DELETE FROM news_articles WHERE published_at < datetime('now', ?)`,
         args: [cutoff],
       }),
     ]);

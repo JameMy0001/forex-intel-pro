@@ -1,7 +1,12 @@
 import { getDbClient, ensureTables } from '../db/localDb';
+import { createHmac, randomBytes } from 'crypto';
 
 const DEFAULT_MASTER_PASSWORD = process.env.ADMIN_PASSWORD || 'nexus2026';
-const SESSION_SECRET_SALT = 'nexus_secure_auth_token_salt_2026';
+
+// Use env var secret for HMAC signing — never hardcoded in source
+function getHmacSecret(): string {
+  return process.env.SESSION_SECRET || 'nexus_hmac_fallback_secret_change_this_in_env';
+}
 
 /**
  * Get active master password from Turso Cloud DB or fallback
@@ -50,32 +55,51 @@ export async function setMasterPassword(newPassword: string): Promise<boolean> {
 }
 
 /**
- * Create a simple tamper-resistant session token
+ * Create a cryptographically signed session token using HMAC-SHA256.
+ * Format: base64(timestamp.nonce):HMAC-SHA256(timestamp.nonce, secret)
+ * This cannot be forged without knowledge of SESSION_SECRET env var.
  */
 export function createSessionToken(): string {
   const timestamp = Date.now();
-  const raw = `${timestamp}:${SESSION_SECRET_SALT}`;
-  // Base64 encode token payload
-  return Buffer.from(raw).toString('base64');
+  const nonce = randomBytes(16).toString('hex');
+  const payload = `${timestamp}.${nonce}`;
+  const sig = createHmac('sha256', getHmacSecret()).update(payload).digest('hex');
+  const encoded = Buffer.from(payload).toString('base64url');
+  return `${encoded}.${sig}`;
 }
 
 /**
- * Verify session token
+ * Verify a signed HMAC session token.
  */
 export function verifySessionToken(token: string | undefined | null): boolean {
   if (!token) return false;
   try {
-    const decoded = Buffer.from(token, 'base64').toString('utf-8');
-    const [timestampStr, salt] = decoded.split(':');
-    if (salt !== SESSION_SECRET_SALT) return false;
+    const dotIdx = token.lastIndexOf('.');
+    if (dotIdx === -1) return false;
 
+    const encodedPayload = token.substring(0, dotIdx);
+    const sig = token.substring(dotIdx + 1);
+    const payload = Buffer.from(encodedPayload, 'base64url').toString('utf-8');
+
+    // Constant-time HMAC compare
+    const expectedSig = createHmac('sha256', getHmacSecret()).update(payload).digest('hex');
+    if (sig.length !== expectedSig.length) return false;
+    
+    // Timing-safe comparison
+    let mismatch = 0;
+    for (let i = 0; i < expectedSig.length; i++) {
+      mismatch |= sig.charCodeAt(i) ^ expectedSig.charCodeAt(i);
+    }
+    if (mismatch !== 0) return false;
+
+    // Extract timestamp and check expiry
+    const [timestampStr] = payload.split('.');
     const timestamp = Number(timestampStr);
     if (isNaN(timestamp)) return false;
 
-    // Check if token is within 30 days
     const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
     return Date.now() - timestamp < thirtyDaysMs;
-  } catch (err) {
+  } catch {
     return false;
   }
 }

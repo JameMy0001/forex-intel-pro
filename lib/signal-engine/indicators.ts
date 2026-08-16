@@ -70,13 +70,17 @@ export function computeTechnicalIndicators(
   const ema50Results = closes.length >= 50
     ? EMA.calculate({ values: closes, period: 50 })
     : ema20Results;
+  // When candle history < 200 bars, use last known price as EMA-200 proxy.
+  // This avoids the critical bug where EMA-50 was used as EMA-200,
+  // causing trend_bias to always appear BULLISH on short datasets.
   const ema200Results = closes.length >= 200
     ? EMA.calculate({ values: closes, period: 200 })
-    : ema50Results;
+    : [];
 
   const latestEMA20 = ema20Results.length > 0 ? ema20Results[ema20Results.length - 1] : currentPrice;
   const latestEMA50 = ema50Results.length > 0 ? ema50Results[ema50Results.length - 1] : currentPrice * 0.99;
-  const latestEMA200 = ema200Results.length > 0 ? ema200Results[ema200Results.length - 1] : currentPrice * 0.97;
+  // EMA-200 fallback: if not enough data, use current price (flat / neutral baseline)
+  const latestEMA200 = ema200Results.length > 0 ? ema200Results[ema200Results.length - 1] : currentPrice;
 
   // 5. ATR (14) - Average True Range for volatility & stop loss / take profit
   const atrResults = ATR.calculate({
