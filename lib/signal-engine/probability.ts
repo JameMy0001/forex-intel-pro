@@ -235,40 +235,9 @@ export function calculateProbabilityScore(
     positionSizePercent = 0.15;
   }
 
-  // --- Micro-Account Sniper Guard ---
+  // --- User Requested: Removed Micro-Account (SL Distance) Penalty and Spread Penalty ---
   let finalProbability = probability;
   let riskPenaltyText = '';
-  // Threshold: 0.15% price move (~15 pips on EURUSD)
-  const maxSafeDistance = 0.0015;
-  
-  if (stopLossDistancePercent > maxSafeDistance && direction !== 'NEUTRAL') {
-    const excess = stopLossDistancePercent - maxSafeDistance;
-    // Heavy penalty for every 0.1% excess
-    const penaltyMultiplier = Math.max(0.1, 1 - (excess * 200)); 
-    if (finalProbability > 0.5) {
-      finalProbability = 0.5 + (finalProbability - 0.5) * penaltyMultiplier;
-    } else {
-      finalProbability = 0.5 - (0.5 - finalProbability) * penaltyMultiplier;
-    }
-    finalProbability = Number(finalProbability.toFixed(3));
-    riskPenaltyText = ` [⚠️ โดนหักคะแนน: ความผันผวนสูงเกินลิมิตทุน $10]`;
-  }
-
-  // --- Session & Spread Shield ---
-  const marketStatus = getMarketStatus(assetType, ticker);
-  if (direction !== 'NEUTRAL') {
-    if (marketStatus.liquidity === 'LOW') {
-      // Penalty: -15% confidence during low liquidity (wider spreads)
-      if (finalProbability > 0.5) finalProbability -= 0.15;
-      else finalProbability += 0.15;
-      riskPenaltyText += ` [⚠️ Spread กว้าง: เลี่ยงเทรดช่วงนี้]`;
-    } else if (marketStatus.liquidity === 'HIGH') {
-      // Boost: +5% confidence during Overlap (tightest spreads)
-      if (finalProbability > 0.5) finalProbability = Math.min(0.99, finalProbability + 0.05);
-      else finalProbability = Math.max(0.01, finalProbability - 0.05);
-    }
-    finalProbability = Number(finalProbability.toFixed(3));
-  }
 
   // --- SMC Shield (God-Tier) ---
   if (indicators.smc_liquidity_sweep === 'BULLISH') {
