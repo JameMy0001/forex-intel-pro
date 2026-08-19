@@ -9,6 +9,8 @@ import { validateTradeSignal } from '@/lib/signal-engine/aiValidator';
 import { getMarketStatus } from '@/lib/market/marketSchedule';
 import { sendTelegramSignalAlert } from '@/lib/alerts/telegram';
 import { isAlertOnCooldown, logAlertSent } from '@/lib/alerts/alertCooldown';
+import { getMacroYieldState } from '@/lib/market/macroYield';
+import { getCoTState, checkCoTVeto } from '@/lib/market/cotTracker';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -43,25 +45,32 @@ export async function GET(request: Request) {
 
     // 1. Smart Daily News Caching (12-24h TTL)
     const news = await getCachedDailyNews(targetSymbols.map((s) => s.ticker));
-    const processed = [];
 
-    for (const sym of targetSymbols) {
+    // Process all symbols concurrently to avoid Vercel 60s timeout
+    const processed = await Promise.all(targetSymbols.map(async (sym) => {
       try {
         // 2. Market Schedule Guard (Check if market is open)
         const marketStatus = getMarketStatus(sym.asset_type, sym.ticker);
 
-        // Fetch Real-time Live Price & 100% Real-time Technical Indicators
-        const quote = await fetchLiveQuote(sym.ticker, sym.asset_type);
-        const candles = await fetchCandleHistory(sym.ticker, sym.asset_type, 'D', 60);
+        // Fetch Real-time Live Price & Data Concurrently
+        const [quote, candles, macroYield, rawCotState] = await Promise.all([
+          fetchLiveQuote(sym.ticker, sym.asset_type),
+          fetchCandleHistory(sym.ticker, sym.asset_type, 'D', 60),
+          getMacroYieldState(sym.ticker, sym.asset_type as any),
+          getCoTState(sym.ticker, sym.asset_type as any)
+        ]);
+
         const indicators = computeTechnicalIndicators(candles, sym.ticker, '1D');
-        const signal = calculateProbabilityScore(
-          sym.ticker,
-          quote.price,
-          quote.change_percent || 0,
-          sym.asset_type,
-          indicators,
-          news
+        let signal = calculateProbabilityScore(
+          sym.ticker, quote.price, quote.change_percent || 0, sym.asset_type as any, indicators, news, undefined, macroYield, rawCotState
         );
+
+        const cotState = checkCoTVeto(signal.direction, rawCotState);
+        if (cotState.veto_signal) {
+          signal = calculateProbabilityScore(
+            sym.ticker, quote.price, quote.change_percent || 0, sym.asset_type as any, indicators, news, undefined, macroYield, cotState
+          );
+        }
 
         // Check Win Rate Threshold (e.g. >= 80%)
         const alertThreshold = (settings.min_alert_probability || sym.alert_threshold || 0.70) * 100;
@@ -88,7 +97,9 @@ export async function GET(request: Request) {
           const onCooldown = await isAlertOnCooldown(sym.ticker, signal.direction, 240);
 
           if (onCooldown) {
-            processed.push({
+            await savePriceSnapshot(quote);
+            await saveSignal(signal);
+            return {
               ticker: sym.ticker,
               price: quote.price,
               direction: signal.direction,
@@ -100,10 +111,7 @@ export async function GET(request: Request) {
               alertReason: `Cooldown active — duplicate ${signal.direction} alert suppressed (< 4h since last alert)`,
               validator: null,
               alertResult: null,
-            });
-            await savePriceSnapshot(quote);
-            await saveSignal(signal);
-            continue;
+            };
           }
 
           // 3. Dual-Agent AI Validator (Agent 2 Cross-Checks Risk)
@@ -124,7 +132,7 @@ export async function GET(request: Request) {
         await savePriceSnapshot(quote);
         await saveSignal(signal);
 
-        processed.push({
+        return {
           ticker: sym.ticker,
           price: quote.price,
           direction: signal.direction,
@@ -138,20 +146,21 @@ export async function GET(request: Request) {
             : !isActionable
             ? 'Direction is NEUTRAL'
             : currentWinRate < alertThreshold
-            ? `Win rate ${currentWinRate}% is below minimum threshold ${alertThreshold}%`
+            ? `Win rate ${currentWinRate}% < ${alertThreshold}%`
             : validatorResult && !validatorResult.isValid
-            ? `Blocked by AI Risk Validator: ${validatorResult.validationNotes}`
-            : 'Alert validated by Dual-Agent and broadcasted to Telegram',
+            ? `AI Validator Blocked: ${validatorResult.validationNotes}`
+            : 'Alert triggered successfully',
           validator: validatorResult,
           alertResult,
-        });
-      } catch (itemErr) {
-        processed.push({
+        };
+      } catch (err) {
+        console.error(`[Ingestion Trigger] Error processing ${sym.ticker}:`, err);
+        return {
           ticker: sym.ticker,
-          error: (itemErr as Error).message,
-        });
+          error: (err as Error).message,
+        };
       }
-    }
+    }));
 
     // 4. Auto-Pruning: Clean records older than 7 days
     const pruneResult = await pruneOldRecords(7).catch(() => ({ deletedSignals: 0, deletedPrices: 0, deletedNews: 0 }));
