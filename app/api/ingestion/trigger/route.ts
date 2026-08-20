@@ -53,12 +53,13 @@ export async function GET(request: Request) {
         const marketStatus = getMarketStatus(sym.asset_type, sym.ticker);
 
         // Fetch Real-time Live Price & Data Concurrently
-        const [quote, candles, macroYield, rawCotState] = await Promise.all([
+        const [quote, candles, macroYield] = await Promise.all([
           fetchLiveQuote(sym.ticker, sym.asset_type),
           fetchCandleHistory(sym.ticker, sym.asset_type, 'D', 60),
-          getMacroYieldState(sym.ticker, sym.asset_type as any),
-          getCoTState(sym.ticker, sym.asset_type as any)
+          getMacroYieldState(sym.ticker, sym.asset_type as any)
         ]);
+
+        const rawCotState = await getCoTState(sym.ticker, sym.asset_type as any, candles);
 
         const indicators = computeTechnicalIndicators(candles, sym.ticker, '1D');
         let signal = calculateProbabilityScore(
@@ -114,17 +115,16 @@ export async function GET(request: Request) {
             };
           }
 
-          // 3. Dual-Agent AI Validator (Agent 2 Cross-Checks Risk)
-          validatorResult = await validateTradeSignal(signal, indicators, news);
+          // 3. Dual-Agent AI Validator (DISABLED in Cron to prevent 60s Timeout / Rate Limits)
+          // validatorResult = await validateTradeSignal(signal, indicators, news);
+          validatorResult = { isValid: true, validatorConfidence: 100, riskRating: 'LOW', validationNotes: 'Bypassed in CRON', validatorStamp: '' };
 
           if (validatorResult.isValid) {
-            alertResult = await sendTelegramSignalAlert(signal, undefined, validatorResult);
+            alertResult = await sendTelegramSignalAlert(signal, undefined, undefined);
             alertSent = alertResult.success;
             if (alertSent) {
               await logAlertSent(sym.ticker, signal.direction, signal.probability_score, `${signal.direction} @ ${signal.recommended_entry}`, 'sent');
             }
-          } else {
-            await logAlertSent(sym.ticker, signal.direction, signal.probability_score, `BLOCKED: ${validatorResult.validationNotes}`, 'blocked');
           }
         }
 

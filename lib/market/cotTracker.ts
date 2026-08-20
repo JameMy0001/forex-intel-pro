@@ -13,7 +13,7 @@ export interface CoTResult {
  * Simulates Commitment of Traders (CoT) data by analyzing long-term (Weekly/Monthly) trend structures
  * In a real Hedge Fund system, this would fetch from CFTC reports.
  */
-export async function getCoTState(ticker: string, assetType: AssetType): Promise<CoTResult> {
+export async function getCoTState(ticker: string, assetType: AssetType, preFetchedCandles?: CandleData[]): Promise<CoTResult> {
   const result: CoTResult = {
     net_positioning: 'NEUTRAL',
     smart_money_bias: 'NEUTRAL',
@@ -23,8 +23,7 @@ export async function getCoTState(ticker: string, assetType: AssetType): Promise
   };
 
   try {
-    // We use Daily candles to simulate longer-term CoT positioning (e.g. 60 days)
-    const candles = await fetchCandleHistory(ticker, assetType, 'D', 60);
+    const candles = preFetchedCandles || await fetchCandleHistory(ticker, assetType, 'D', 60);
     if (candles.length < 30) return result;
 
     const currentClose = candles[candles.length - 1].close;

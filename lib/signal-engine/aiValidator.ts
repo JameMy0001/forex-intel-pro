@@ -47,7 +47,7 @@ export async function validateTradeSignal(
 
   // 2. Attempt AI Validation with Gemini Multi-Agent
   if (GEMINI_API_KEY) {
-    const activeModels = ['gemini-flash-lite-latest', 'gemini-3.5-flash'];
+    const activeModels = ['gemini-1.5-flash', 'gemini-2.5-flash'];
     const newsSummary = newsArticles.slice(0, 3).map((a) => `- ${a.headline || a.summary}`).join('\n');
 
     const prompt = `คุณคือ Senior Risk Officer & Quantitative Trade Validator ประจำกองทุนสถาบัน
@@ -72,10 +72,14 @@ ${newsSummary || 'ไม่มีข่าวรุนแรงในระย�
 
     for (const model of activeModels) {
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout per model
+
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
         const res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
@@ -85,6 +89,7 @@ ${newsSummary || 'ไม่มีข่าวรุนแรงในระย�
             },
           }),
         });
+        clearTimeout(timeoutId);
 
         if (res.ok) {
           const json = await res.json();
