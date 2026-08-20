@@ -227,10 +227,40 @@ export function calculateProbabilityScore(
     rr = Number(((currentPrice - tp1) / (stopLoss - currentPrice)).toFixed(2));
   }
 
-  // Position Sizing (Fixed 1% Risk)
+  // --- $10 Micro Account Risk Management Override ---
+  // Max risk: $1.50 per trade. For USDJPY 0.01 Lot, 1 pip = ~$0.066.
+  // Max Stop Loss distance = 20 pips (0.20 JPY).
+  // Min Stop Loss distance = 10 pips (0.10 JPY) to avoid spread hunting.
+  const isJpy = ticker.includes('JPY');
+  const maxSlPips = 20;
+  const minSlPips = 10;
+  
+  if (isJpy && (isBullish || isBearish)) {
+    const maxSlDist = maxSlPips * 0.01;
+    const minSlDist = minSlPips * 0.01;
+    
+    let rawSlDist = Math.abs(currentPrice - stopLoss);
+    
+    // Hardcap SL distance for $10 account survival
+    if (rawSlDist > maxSlDist) rawSlDist = maxSlDist;
+    if (rawSlDist < minSlDist) rawSlDist = minSlDist;
+    
+    // Re-apply locked SL and calculate strict TP based on Risk:Reward
+    if (isBullish) {
+      stopLoss = Number((currentPrice - rawSlDist).toFixed(decimals));
+      tp1 = Number((currentPrice + (rawSlDist * 1.5)).toFixed(decimals)); // 1:1.5 RR
+      tp2 = Number((currentPrice + (rawSlDist * 3.0)).toFixed(decimals)); // 1:3 RR
+    } else if (isBearish) {
+      stopLoss = Number((currentPrice + rawSlDist).toFixed(decimals));
+      tp1 = Number((currentPrice - (rawSlDist * 1.5)).toFixed(decimals));
+      tp2 = Number((currentPrice - (rawSlDist * 3.0)).toFixed(decimals));
+    }
+    rr = 1.5; // Base RR for TP1
+  }
+
+  // Position Sizing (Fixed 1% Risk - Disabled logic for $10 account visually, but keeping variable for type safety)
   const stopLossDistancePercent = Math.abs(currentPrice - stopLoss) / currentPrice;
   let positionSizePercent = stopLossDistancePercent > 0 ? Number((0.01 / stopLossDistancePercent).toFixed(4)) : 0;
-  // Cap position size to max 15% to prevent infinite leverage display on tight SL
   if (positionSizePercent > 0.15) {
     positionSizePercent = 0.15;
   }
