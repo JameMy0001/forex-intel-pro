@@ -8,7 +8,7 @@ export const DEFAULT_SYMBOLS: SymbolInfo[] = [
     display_name: 'EUR / USD (Euro / US Dollar)',
     asset_type: 'forex',
     category: 'Major FX',
-    is_active: true,
+    is_active: false, // User requested USDJPY ONLY
     alert_threshold: 0.70,
   },
   {
@@ -27,7 +27,7 @@ export const DEFAULT_SYMBOLS: SymbolInfo[] = [
     asset_type: 'forex',
     category: 'Major FX',
     is_active: true,
-    alert_threshold: 0.70,
+    alert_threshold: 0.75, // Increased from 0.70 to ensure ultra-high precision trades only
   },
   {
     ticker: 'AUDUSD',
@@ -35,7 +35,7 @@ export const DEFAULT_SYMBOLS: SymbolInfo[] = [
     display_name: 'AUD / USD (Aussie / US Dollar)',
     asset_type: 'forex',
     category: 'Major FX',
-    is_active: true,
+    is_active: false, // User requested USDJPY ONLY
     alert_threshold: 0.70,
   },
   {
@@ -44,7 +44,7 @@ export const DEFAULT_SYMBOLS: SymbolInfo[] = [
     display_name: 'USD / CHF (US Dollar / Swiss Franc)',
     asset_type: 'forex',
     category: 'Major FX',
-    is_active: true,
+    is_active: false, // User requested USDJPY ONLY
     alert_threshold: 0.70,
   },
   {
@@ -53,7 +53,7 @@ export const DEFAULT_SYMBOLS: SymbolInfo[] = [
     display_name: 'USD / CAD (US Dollar / Canadian Dollar)',
     asset_type: 'forex',
     category: 'Major FX',
-    is_active: true,
+    is_active: false, // User requested USDJPY ONLY
     alert_threshold: 0.70,
   },
   {
